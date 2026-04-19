@@ -15,6 +15,7 @@ build/
 # Data (keep sample_docs, ignore runtime data)
 data/uploads/
 data/chroma_db/
+data/chroma/
 
 # IDE
 .vscode/
