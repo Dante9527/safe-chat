@@ -52,10 +52,10 @@ curl -X POST http://localhost:11434/api/generate \
 **排查 3：SafeChat 應用是否完成預熱？**
 
 ```bash
-docker compose logs safe-chat | grep "RAG engine ready\|pre-loading"
+docker compose logs safe-chat | grep "就緒"
 ```
 
-若看到 `RAG engine ready — all components loaded`，代表 lifespan 預熱完成。若沒看到，應用可能還在啟動中。
+若看到 `RAG 引擎就緒 — 所有元件已載入，開始接受請求。`，代表預熱完成。模型載入約需 4-5 分鐘，期間瀏覽器會顯示載入頁面。
 
 **排查 4：用 Ollama verbose 模式確認 prefill 時間**
 
@@ -95,7 +95,7 @@ MAX_CHAPTER_ARTICLES=8
 |------|------|
 | Docker build（下載 Python 套件） | 2-5 分鐘 |
 | 下載 `intfloat/multilingual-e5-large-instruct` 模型（~2.2 GB） | 3-8 分鐘 |
-| SafeChat lifespan 預熱（multilingual-e5-large-instruct + ChromaDB 初始化） | 10-30 秒 |
+| SafeChat 背景預熱（multilingual-e5-large-instruct + ChromaDB 初始化） | 4-5 分鐘 |
 | **總計** | **3-8 分鐘** |
 
 Ollama 模型（~4.7 GB）需另外下載：
@@ -103,7 +103,7 @@ Ollama 模型（~4.7 GB）需另外下載：
 ollama pull llama3.1:8b    # 或 .env 中指定的模型，首次約 5-15 分鐘
 ```
 
-重啟只要數秒（lifespan 預熱），因為 Docker image 和 Ollama 模型都已 cached。
+重啟後模型需重新載入（約 4-5 分鐘），期間會顯示載入頁面，就緒後自動跳轉。Docker image 和 Ollama 模型已 cached，不需重新下載。
 
 **追蹤進度：**
 ```bash

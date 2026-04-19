@@ -165,7 +165,7 @@ docker compose up -d
 1. 建置 SafeChat image（約 2-3 分鐘）
 2. 啟動 SafeChat 容器，連接 host Ollama
 
-首次啟動約 2-3 分鐘（建置 image）。之後重啟只要數秒。
+首次啟動約 2-3 分鐘（建置 image）。模型載入約 4-5 分鐘，期間會顯示載入頁面，就緒後自動跳轉。
 
 ### Step 5：驗證運作
 

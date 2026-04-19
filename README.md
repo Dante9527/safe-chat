@@ -172,7 +172,7 @@ RecursiveCharacterTextSplitter(
 - **Health check endpoint** — `/api/health` 檢查 LLM、向量庫、磁碟空間狀態
 - **UI 即時狀態指示** — 右上角燈號顯示綠/黃/紅三級警示
 - **Degraded message banner** — 離線模式下的回答有黃色警示邊條
-- **Lifespan 預熱** — 應用啟動時預載 SentenceTransformer、ChromaDB、LLM 客戶端，healthcheck 通過後用戶首次請求無冷啟動
+- **背景預熱 + 載入頁面** — 啟動後立即顯示載入頁面，背景載入 SentenceTransformer、ChromaDB、LLM 客戶端（約 4-5 分鐘），就緒後自動跳轉到主介面
 - **OLLAMA_KEEP_ALIVE=-1** — 模型永久留在記憶體，閒置不卸載，避免 30-60s 重載延遲
 - **OLLAMA_FLASH_ATTENTION=1** — 長 context 加速 20-40%，啟用 KV-cache 量化（2026 社群標準做法）
 - **MAX_CHAPTER_ARTICLES=8** — 章節擴展上限，避免 prompt 過大拖慢回應且稀釋相關性

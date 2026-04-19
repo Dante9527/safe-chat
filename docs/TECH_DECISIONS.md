@@ -231,21 +231,26 @@ curl -X POST http://localhost:11434/api/generate \
   -d '{"model":"llama3.1:8b","prompt":"hi","stream":false,"keep_alive":-1}'
 ```
 
-### 修復 2：FastAPI Lifespan 預熱
+### 修復 2：背景載入 + 載入頁面
 
 ```python
-# app/main.py — 用 lifespan 取代 lazy get_rag()
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global rag
+# app/main.py — 獨立 thread 載入模型，不阻塞 HTTP 服務
+def _init_rag_sync():
+    global rag, _rag_ready
     rag = RAGEngine(...)       # SentenceTransformer + ChromaDB 在此初始化
     _ = rag.llm                # 觸發 LLM 客戶端初始化
+    _rag_ready = True
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=_init_rag_sync, daemon=True).start()
     yield
 ```
 
-原本的 lazy init 把所有初始化（PyTorch import、`intfloat/multilingual-e5-large-instruct` 模型載入、ChromaDB HNSW 索引讀取）全堆在第一次請求上，加起來 10-30 秒。移到 lifespan 後，`/api/health` 通過時所有組件已就緒，用戶首次請求不再有冷啟動。
-
-FastAPI 官方文件明確推薦此模式：[Lifespan Events](https://fastapi.tiangolo.com/advanced/events/)。
+模型載入（e5-large-instruct ~2.2GB）在 Docker CPU 環境需約 4-5 分鐘。原本的阻塞式 lifespan 會導致用戶看到「無法連上網站」。改為背景載入後，服務立即接受連線：
+- 載入期間：`/` 回傳載入頁面（`templates/loading.html`），每 5 秒輪詢 `/api/health`
+- `/api/health` 回傳 503 + `{"status": "starting"}`
+- 就緒後：頁面自動跳轉到主介面，首次請求無冷啟動
 
 ### 修復 3：遷移到 `langchain_ollama.ChatOllama`
 
