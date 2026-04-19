@@ -27,5 +27,8 @@ data/chroma_db/
 .DS_Store
 Thumbs.db
 
+# Node
+node_modules/
+
 # Logs
 *.log

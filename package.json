@@ -1,0 +1,25 @@
+{
+  "name": "safe-chat",
+  "version": "1.0.0",
+  "description": "**AI-Powered Construction Safety Q&A — 工地安全 AI 助理**",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.1",
+    "eslint-plugin-vue": "^10.8.0",
+    "prettier": "^3.8.3",
+    "stylelint": "^17.8.0",
+    "stylelint-config-standard": "^40.0.0"
+  }
+}

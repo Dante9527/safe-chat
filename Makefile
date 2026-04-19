@@ -11,7 +11,7 @@
 #   make test       測試 RAG 端對端流程
 # ============================================================================
 
-.PHONY: help up build down logs logs-app status clean shell test fetch-laws pull-model rebuild lint format format-check typecheck
+.PHONY: help up build down logs logs-app status clean shell test fetch-laws pull-model rebuild lint format format-check typecheck lint-js lint-css lint-html format-fe format-fe-check
 
 # 預設顯示說明
 help:
@@ -153,3 +153,21 @@ format-check:
 
 typecheck:
 	pyright app/
+
+# ---------------------------------------------------------------------------
+# 前端品質
+# ---------------------------------------------------------------------------
+lint-js:
+	npx eslint static/js/
+
+lint-css:
+	npx stylelint "static/css/**/*.css"
+
+lint-html:
+	npx eslint templates/
+
+format-fe:
+	npx prettier --write "static/**/*.{js,css}" "templates/**/*.html"
+
+format-fe-check:
+	npx prettier --check "static/**/*.{js,css}" "templates/**/*.html"
