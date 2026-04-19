@@ -9,11 +9,12 @@ RAG 回答品質回歸測試。
     # 或
     python tests/test_rag_quality.py [--base-url http://localhost:8000]
 
-已知限制（Llama 3.1 8B + top_k=3 結構性限制）：
+已知限制（Llama 3.1 8B 結構性限制）：
     - 語意相近但不同領域的條文可能被誤檢索（如「高空」→ 呼吸防護而非墜落防護）
-    - top_k=3 只有 3 次機會，檢索偏差無法靠後續結果修正
     - 8B 模型在多條法規間的相關性判斷力有限
+    - LLM 回答措辭可能與法條原文不同（如「護蓋」→「加蓋」）
     標記為 xfail 的測試案例即為此類限制的已知案例。
+    must_have 支援 tuple 同義詞（任一命中即可），用於處理措辭差異。
 """
 
 from __future__ import annotations
@@ -26,7 +27,8 @@ import urllib.request
 BASE_URL = "http://localhost:8000"
 
 # (問題, 必須命中的條號/關鍵字, 不應出現的條號/關鍵字, 是否為已知限制)
-TEST_CASES: list[tuple[str, list[str], list[str], bool]] = [
+# must_have 元素為 str 時須完全命中；為 tuple[str, ...] 時任一命中即可（同義詞）。
+TEST_CASES: list[tuple[str, list[str | tuple[str, ...]], list[str], bool]] = [
     # --- 施工架 ---
     (
         "施工架搭設有哪些安全規範？",
@@ -74,7 +76,7 @@ TEST_CASES: list[tuple[str, list[str], list[str], bool]] = [
     # --- 開口 / 開挖 ---
     (
         "開口部分應如何防護？",
-        ["護蓋"],
+        [("護蓋", "加蓋", "封閉")],
         [],
         False,
     ),
@@ -126,7 +128,7 @@ TEST_CASES: list[tuple[str, list[str], list[str], bool]] = [
     # --- 跨法規 ---
     (
         "高度二公尺以上作業場所的防護設備？",
-        ["護欄"],
+        [("護欄", "欄杆", "女兒牆")],
         [],
         False,
     ),
@@ -202,7 +204,15 @@ def run_tests(base_url: str = BASE_URL) -> None:
         elapsed = time.time() - start
         answer = result.get("answer", "")
 
-        missing = [kw for kw in must_have if kw not in answer]
+        missing = [
+            kw
+            for kw in must_have
+            if (
+                isinstance(kw, tuple)
+                and not any(syn in answer for syn in kw)
+            )
+            or (isinstance(kw, str) and kw not in answer)
+        ]
         unwanted = [kw for kw in must_not_have if kw in answer]
 
         ok = not missing and not unwanted
