@@ -57,7 +57,7 @@ class Settings:
             ollama_num_ctx=_env_int("OLLAMA_NUM_CTX", "8192"),
             llm_temperature=_env_float("LLM_TEMPERATURE", "0.1"),
             embedding_model=os.getenv(
-                "EMBEDDING_MODEL", "intfloat/multilingual-e5-base"
+                "EMBEDDING_MODEL", "intfloat/multilingual-e5-large-instruct"
             ),
             rag_top_k=_env_int("RAG_TOP_K", "5"),
             rag_prompt_chunk_chars=_env_int("RAG_PROMPT_CHUNK_CHARS", "600"),

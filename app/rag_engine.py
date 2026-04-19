@@ -2,7 +2,7 @@
 SafeChat RAG Engine — 文件匯入、向量檢索、LLM 問答。
 
 LLM 後端使用 Ollama 本地模型（無需 API key，適合工地離線部署）。
-嵌入模型預設使用 intfloat/multilingual-e5-base（Microsoft 開源），
+嵌入模型預設使用 intfloat/multilingual-e5-large-instruct（Microsoft 開源），
 原生支援中文營建安全文件。
 """
 
@@ -40,12 +40,19 @@ class SentenceTransformerEmbedding(chromadb.EmbeddingFunction):
     自動偵測 E5 系列模型，為輸入文本加上必要的前綴（"query: " / "passage: "）。
     """
 
+    _E5_INSTRUCT_TASK = (
+        "Given a construction safety question in Traditional Chinese, "
+        "retrieve relevant regulatory passages"
+    )
+
     def __init__(self, model_name: str) -> None:
         from sentence_transformers import SentenceTransformer
 
         self._model_name = model_name
         self.model = SentenceTransformer(model_name)
-        self._is_e5 = "e5" in model_name.lower()
+        name_lower = model_name.lower()
+        self._is_e5 = "e5" in name_lower
+        self._is_e5_instruct = self._is_e5 and "instruct" in name_lower
 
     def __call__(self, input: list[str]) -> list[list[float]]:
         texts = [f"passage: {t}" for t in input] if self._is_e5 else input
@@ -53,8 +60,16 @@ class SentenceTransformerEmbedding(chromadb.EmbeddingFunction):
         return embeddings.tolist()
 
     def query(self, input: list[str]) -> list[list[float]]:
-        """查詢用嵌入 — E5 模型使用 'query: ' 前綴以提升檢索品質。"""
-        texts = [f"query: {t}" for t in input] if self._is_e5 else input
+        """查詢用嵌入 — E5-instruct 使用任務描述前綴，E5-base 使用 'query: ' 前綴。"""
+        if self._is_e5_instruct:
+            texts = [
+                f"Instruct: {self._E5_INSTRUCT_TASK}\nQuery: {t}"
+                for t in input
+            ]
+        elif self._is_e5:
+            texts = [f"query: {t}" for t in input]
+        else:
+            texts = input
         embeddings = self.model.encode(texts, show_progress_bar=False)
         return embeddings.tolist()
 
