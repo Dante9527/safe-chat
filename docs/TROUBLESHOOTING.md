@@ -94,8 +94,8 @@ MAX_CHAPTER_ARTICLES=8
 | 步驟 | 時間 |
 |------|------|
 | Docker build（下載 Python 套件） | 2-5 分鐘 |
-| 下載 `intfloat/multilingual-e5-base` 模型（~1.1 GB） | 2-5 分鐘 |
-| SafeChat lifespan 預熱（multilingual-e5-base + ChromaDB 初始化） | 10-30 秒 |
+| 下載 `intfloat/multilingual-e5-large-instruct` 模型（~2.2 GB） | 3-8 分鐘 |
+| SafeChat lifespan 預熱（multilingual-e5-large-instruct + ChromaDB 初始化） | 10-30 秒 |
 | **總計** | **3-8 分鐘** |
 
 Ollama 模型（~4.7 GB）需另外下載：

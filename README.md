@@ -135,7 +135,7 @@ uvicorn app.main:app --reload
 | 後端 | **FastAPI** | 高效能、async、自動 Swagger docs |
 | RAG | **LangChain** | Pipeline 標準化、多 LLM 後端 |
 | 向量庫 | **ChromaDB** | 嵌入式、零部署、cosine search |
-| Embedding | **multilingual-e5-base** (sentence-transformers) | 本地執行、多語言中文支援、免 API key |
+| Embedding | **multilingual-e5-large-instruct** (sentence-transformers) | 本地執行、多語言中文支援、免 API key |
 | LLM | **Ollama + Llama 3.1** | 地端部署、資料不出場、零 API 費用 |
 | PDF | **PyPDF** | 中文解析穩定 |
 
@@ -162,7 +162,7 @@ RecursiveCharacterTextSplitter(
 - **Cosine similarity** 向量檢索，預設 top-5 + 章節自動擴展（可透過 `RAG_TOP_K` 調整）
 - 法規條文級切分，每條保留完整內容與章節歸屬，檢索到同章 2+ 條文時自動帶入全章
 - 回傳來源文件名 + 條號 + 相關度 %，可追溯原文
-- 多語言 embedding 模型（`intfloat/multilingual-e5-base`），原生支援中文語意檢索
+- 多語言 embedding 模型（`intfloat/multilingual-e5-large-instruct`），原生支援中文語意檢索
 
 ### 🛡 Resilience Features（邊緣部署特化）
 
