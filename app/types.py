@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Protocol, TypedDict
+from typing import Protocol
+
+from typing_extensions import TypedDict
 
 
 # ---------------------------------------------------------------------------
