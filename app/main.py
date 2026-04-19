@@ -16,7 +16,6 @@ import uuid
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,10 +26,13 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from . import health as health_checks
 from .config import get_settings, init_settings, setup_logging
 from .rag_engine import RAGEngine
+from .types import HealthResult, KBStats, SourceSummary
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -115,7 +117,9 @@ if settings.cors_origins:
 # 中介層 — API Key 驗證 + 安全標頭
 # ---------------------------------------------------------------------------
 @app.middleware("http")
-async def security_middleware(request: Request, call_next: Any) -> Any:
+async def security_middleware(
+    request: Request, call_next: RequestResponseEndpoint
+) -> Response:
     """API Key 驗證（可選）與安全回應標頭。"""
     s = get_settings()
     if s.api_key:
@@ -154,7 +158,7 @@ class AnswerResponse(BaseModel):
     """回答結果，包含答案、來源與降級狀態。"""
 
     answer: str
-    sources: list[dict[str, Any]]
+    sources: list[SourceSummary]
     question: str
     degraded: bool = False
 
@@ -292,18 +296,18 @@ async def ask_question_stream(
 
 @app.get("/api/stats")
 @limiter.limit(settings.rate_limit)
-async def knowledge_base_stats(request: Request) -> dict[str, Any]:
+async def knowledge_base_stats(request: Request) -> KBStats:
     """回傳知識庫基本統計（文件數、區塊數）。"""
     engine = get_rag()
-    return {
-        "total_chunks": engine.collection_count(),
-        "documents": engine.list_documents(),
-    }
+    return KBStats(
+        total_chunks=engine.collection_count(),
+        documents=engine.list_documents(),
+    )
 
 
 @app.get("/api/health")
 @limiter.limit(settings.rate_limit)
-async def health_check(request: Request) -> dict[str, Any]:
+async def health_check(request: Request) -> HealthResult:
     """系統健康檢查 — 回傳 LLM、向量資料庫、磁碟三項狀態。"""
     return health_checks.aggregate(get_settings(), get_rag(), UPLOAD_DIR)
 
