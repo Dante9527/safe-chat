@@ -169,7 +169,7 @@ def ask(question: str, base_url: str = BASE_URL) -> dict:
         try:
             with urllib.request.urlopen(req, timeout=180) as resp:
                 return json.loads(resp.read().decode())
-        except (ConnectionError, OSError) as e:
+        except (ConnectionError, OSError):
             if attempt < 2:
                 time.sleep(5)
             else:

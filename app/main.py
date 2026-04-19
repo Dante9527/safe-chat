@@ -13,25 +13,29 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from typing import Any
+
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-
 from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
-from .config import init_settings, get_settings, setup_logging
-from .rag_engine import RAGEngine
 from . import health as health_checks
+from .config import get_settings, init_settings, setup_logging
+from .rag_engine import RAGEngine
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+_UPLOAD_FILE = File()
 
 # ---------------------------------------------------------------------------
 # 路徑
@@ -57,7 +61,7 @@ rag: RAGEngine | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """啟動前預載所有重型元件，確保首次請求不會冷啟動。"""
     global rag
     s = get_settings()
@@ -88,7 +92,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 
 @app.exception_handler(RateLimitExceeded)
-async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     return JSONResponse(
         status_code=429,
         content={"detail": "請求過於頻繁，請稍後再試。"},
@@ -111,7 +115,7 @@ if settings.cors_origins:
 # 中介層 — API Key 驗證 + 安全標頭
 # ---------------------------------------------------------------------------
 @app.middleware("http")
-async def security_middleware(request: Request, call_next):
+async def security_middleware(request: Request, call_next: Any) -> Any:
     """API Key 驗證（可選）與安全回應標頭。"""
     s = get_settings()
     if s.api_key:
@@ -141,14 +145,16 @@ async def security_middleware(request: Request, call_next):
 # ---------------------------------------------------------------------------
 class QuestionRequest(BaseModel):
     """使用者提問請求。"""
+
     question: str = Field(..., min_length=1, max_length=1000)
     top_k: int | None = Field(default=None, ge=1, le=10)
 
 
 class AnswerResponse(BaseModel):
     """回答結果，包含答案、來源與降級狀態。"""
+
     answer: str
-    sources: list[dict]
+    sources: list[dict[str, Any]]
     question: str
     degraded: bool = False
 
@@ -157,7 +163,7 @@ class AnswerResponse(BaseModel):
 # 路由 — 頁面
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
-async def index():
+async def index() -> HTMLResponse:
     """提供主聊天介面 HTML。"""
     return HTMLResponse(
         content=(BASE_DIR / "templates" / "index.html").read_text(encoding="utf-8")
@@ -195,28 +201,34 @@ async def _save_upload(file: UploadFile) -> Path:
 
 @app.post("/api/upload")
 @limiter.limit(settings.rate_limit)
-async def upload_document(request: Request, file: UploadFile = File(...)):
+async def upload_document(
+    request: Request, file: UploadFile = _UPLOAD_FILE
+) -> JSONResponse:
     """接收使用者上傳的文件，驗證後存檔並匯入向量資料庫。"""
     _validate_upload(file.filename)
     dest = await _save_upload(file)
 
     try:
-        num_chunks = get_rag().ingest_document(str(dest), original_name=file.filename)
+        num_chunks = get_rag().ingest_document(
+            str(dest), original_name=file.filename or ""
+        )
     except Exception as e:
         logger.error("Ingest failed for %s: %s", dest.name, e)
         dest.unlink(missing_ok=True)
-        raise HTTPException(422, "文件處理失敗，請確認檔案格式正確。")
-    return JSONResponse({
-        "status": "ok",
-        "filename": file.filename,
-        "chunks": num_chunks,
-        "message": f"已成功匯入 {file.filename}，切分為 {num_chunks} 個文本區塊。",
-    })
+        raise HTTPException(422, "文件處理失敗，請確認檔案格式正確。") from e
+    return JSONResponse(
+        {
+            "status": "ok",
+            "filename": file.filename,
+            "chunks": num_chunks,
+            "message": f"已成功匯入 {file.filename}，切分為 {num_chunks} 個文本區塊。",
+        }
+    )
 
 
 @app.post("/api/ask", response_model=AnswerResponse)
 @limiter.limit(settings.rate_limit)
-async def ask_question(request: Request, req: QuestionRequest):
+async def ask_question(request: Request, req: QuestionRequest) -> AnswerResponse:
     """透過 RAG 回答營建安全問題。"""
     engine = get_rag()
 
@@ -231,21 +243,26 @@ async def ask_question(request: Request, req: QuestionRequest):
     return AnswerResponse(**result)
 
 
-def _empty_kb_stream(question: str):
+def _empty_kb_stream(question: str) -> Generator[str, None, None]:
     """知識庫為空時，產生提示使用者上傳文件的 SSE 串流。"""
     empty_msg = "⚠️ 目前知識庫為空，請先上傳工安法規或安全手冊 PDF。"
-    payload = json.dumps({
-        "error": "knowledge base empty",
-        "fallback_answer": empty_msg,
-        "sources": [],
-        "question": question,
-        "degraded": False,
-    }, ensure_ascii=False)
+    payload = json.dumps(
+        {
+            "error": "knowledge base empty",
+            "fallback_answer": empty_msg,
+            "sources": [],
+            "question": question,
+            "degraded": False,
+        },
+        ensure_ascii=False,
+    )
     yield f"event: error\ndata: {payload}\n\n"
     yield "event: done\ndata: {}\n\n"
 
 
-def _llm_stream(engine: RAGEngine, question: str, top_k: int | None):
+def _llm_stream(
+    engine: RAGEngine, question: str, top_k: int | None
+) -> Generator[str, None, None]:
     """透過 LLM 串流產生回答，逐 token 以 SSE 格式送出。"""
     for item in engine.query_stream(question, top_k=top_k):
         data = json.dumps(item["data"], ensure_ascii=False)
@@ -254,7 +271,9 @@ def _llm_stream(engine: RAGEngine, question: str, top_k: int | None):
 
 @app.post("/api/ask/stream")
 @limiter.limit(settings.rate_limit)
-async def ask_question_stream(request: Request, req: QuestionRequest):
+async def ask_question_stream(
+    request: Request, req: QuestionRequest
+) -> StreamingResponse:
     """以 Server-Sent Events 串流方式回答工安問題。"""
     engine = get_rag()
 
@@ -273,7 +292,7 @@ async def ask_question_stream(request: Request, req: QuestionRequest):
 
 @app.get("/api/stats")
 @limiter.limit(settings.rate_limit)
-async def knowledge_base_stats(request: Request):
+async def knowledge_base_stats(request: Request) -> dict[str, Any]:
     """回傳知識庫基本統計（文件數、區塊數）。"""
     engine = get_rag()
     return {
@@ -284,7 +303,7 @@ async def knowledge_base_stats(request: Request):
 
 @app.get("/api/health")
 @limiter.limit(settings.rate_limit)
-async def health_check(request: Request):
+async def health_check(request: Request) -> dict[str, Any]:
     """系統健康檢查 — 回傳 LLM、向量資料庫、磁碟三項狀態。"""
     return health_checks.aggregate(get_settings(), get_rag(), UPLOAD_DIR)
 
@@ -294,7 +313,7 @@ async def health_check(request: Request):
 async def reset_knowledge_base(
     request: Request,
     x_admin_token: str = Header("", alias="X-Admin-Token"),
-):
+) -> dict[str, str]:
     """清空整個向量資料庫（需管理員 token 驗證）。"""
     s = get_settings()
     if not s.admin_token:

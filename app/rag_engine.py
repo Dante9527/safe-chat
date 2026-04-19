@@ -2,19 +2,22 @@
 SafeChat RAG Engine — 文件匯入、向量檢索、LLM 問答。
 
 LLM 後端使用 Ollama 本地模型（無需 API key，適合工地離線部署）。
-嵌入模型預設使用 intfloat/multilingual-e5-base（Microsoft 開源），原生支援中文營建安全文件。
+嵌入模型預設使用 intfloat/multilingual-e5-base（Microsoft 開源），
+原生支援中文營建安全文件。
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Generator
 from pathlib import Path
+from typing import Any
+
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader, TextLoader
 
 from .config import Settings
 
@@ -32,6 +35,7 @@ class SentenceTransformerEmbedding(chromadb.EmbeddingFunction):
 
     def __init__(self, model_name: str) -> None:
         from sentence_transformers import SentenceTransformer
+
         self._model_name = model_name
         self.model = SentenceTransformer(model_name)
         self._is_e5 = "e5" in model_name.lower()
@@ -70,7 +74,8 @@ QA_PROMPT_TEMPLATE = """\
    - 來源含條號 → 格式：「依據《法規名》第 X 條，…」
    - 來源不含條號 → 僅註明文件名稱，禁止猜測條號。
 5. 以條列式精簡回答，每點一個重點，不重複，不分段。
-6. 只有在參考資料完全無法回答問題時，才說明「參考資料中未涵蓋此內容」。已列出部分要點時不得加此句。
+6. 只有在參考資料完全無法回答問題時，才說明「參考資料中未涵蓋此內容」。
+   已列出部分要點時不得加此句。
 """
 
 
@@ -93,7 +98,7 @@ class RAGEngine:
             embedding_function=self._embed_fn,
             metadata={"hnsw:space": "cosine"},
         )
-        self._llm: object | None = None
+        self._llm: Any | None = None
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
@@ -101,17 +106,21 @@ class RAGEngine:
         )
         logger.info(
             "RAGEngine ready — collection '%s' has %d chunks",
-            settings.collection_name, self._collection.count(),
+            settings.collection_name,
+            self._collection.count(),
         )
 
     # -- LLM（延遲載入）-----------------------------------------------------
-    def _build_llm(self) -> object:
+    def _build_llm(self) -> Any:
         """建立 Ollama 本地 LLM 實例。"""
         from langchain_ollama import ChatOllama
+
         s = self._settings
         logger.info(
             "Using Ollama model: %s @ %s (num_ctx=%d)",
-            s.ollama_model, s.ollama_base_url, s.ollama_num_ctx,
+            s.ollama_model,
+            s.ollama_base_url,
+            s.ollama_num_ctx,
         )
         return ChatOllama(
             model=s.ollama_model,
@@ -121,7 +130,7 @@ class RAGEngine:
         )
 
     @property
-    def llm(self) -> object:
+    def llm(self) -> Any:
         """取得 LLM 實例（首次存取時初始化）。"""
         if self._llm is None:
             self._llm = self._build_llm()
@@ -130,11 +139,11 @@ class RAGEngine:
     # -- 文件匯入 -----------------------------------------------------------
 
     # 法規條文標題正則 — 匹配 "### 第 X 條" 或 "### 第 X-Y 條"
-    _ARTICLE_RE = re.compile(r'^### (第 [\d\-]+ 條)', re.MULTILINE)
+    _ARTICLE_RE = re.compile(r"^### (第 [\d\-]+ 條)", re.MULTILINE)
     # 章節標題正則 — 匹配 "## 第 X 章 ..."
-    _CHAPTER_RE = re.compile(r'^## (第 .+ 章.*)', re.MULTILINE)
+    _CHAPTER_RE = re.compile(r"^## (第 .+ 章.*)", re.MULTILINE)
 
-    def _load_raw(self, filepath: str) -> list:
+    def _load_raw(self, filepath: str) -> list[Any]:
         """載入文件（PDF / TXT / MD），回傳 LangChain Document 列表。"""
         path = Path(filepath)
         ext = path.suffix.lower()
@@ -162,7 +171,7 @@ class RAGEngine:
                 break
         return chapter
 
-    def _split_by_article(self, text: str) -> list[dict]:
+    def _split_by_article(self, text: str) -> list[dict[str, str]]:
         """依法規條文邊界切分文本，保留完整條文與章節歸屬。
 
         回傳 [{"text": ..., "article": "第 X 條", "chapter": "第 四 章 ..."}, ...]。
@@ -174,7 +183,7 @@ class RAGEngine:
 
         chapter_map = self._build_chapter_map(text)
 
-        chunks: list[dict] = []
+        chunks: list[dict[str, str]] = []
         for idx, (start, match) in enumerate(positions):
             end = positions[idx + 1][0] if idx + 1 < len(positions) else len(text)
             section = text[start:end].strip()
@@ -186,7 +195,13 @@ class RAGEngine:
             else:
                 sub_docs = self._splitter.create_documents([section])
                 for sub in sub_docs:
-                    chunks.append({"text": sub.page_content, "article": article, "chapter": chapter})
+                    chunks.append(
+                        {
+                            "text": sub.page_content,
+                            "article": article,
+                            "chapter": chapter,
+                        }
+                    )
 
         return chunks
 
@@ -196,8 +211,10 @@ class RAGEngine:
         if not article_chunks:
             return 0
 
-        ids = [f"{source_label}::{c['article']}::chunk_{i}"
-               for i, c in enumerate(article_chunks)]
+        ids = [
+            f"{source_label}::{c['article']}::chunk_{i}"
+            for i, c in enumerate(article_chunks)
+        ]
         texts = [c["text"] for c in article_chunks]
         metadatas = [
             {
@@ -212,7 +229,7 @@ class RAGEngine:
         self._collection.upsert(ids=ids, documents=texts, metadatas=metadatas)
         return len(article_chunks)
 
-    def _ingest_general(self, raw_docs: list, source_label: str) -> int:
+    def _ingest_general(self, raw_docs: list[Any], source_label: str) -> int:
         """一般文件匯入 — 用 RecursiveCharacterTextSplitter 切分。"""
         chunks = self._splitter.split_documents(raw_docs)
         if not chunks:
@@ -274,10 +291,10 @@ class RAGEngine:
     @staticmethod
     def _is_regulation(source: str) -> bool:
         """判斷來源是否為法規檔案（以 N 開頭的編號檔名）。"""
-        return bool(re.match(r'^N\d+_', source))
+        return bool(re.match(r"^N\d+_", source))
 
     def _build_prompt_context(
-        self, docs: list[str], metas: list[dict], chapter_header: str = ""
+        self, docs: list[str], metas: list[dict[str, Any]], chapter_header: str = ""
     ) -> str:
         """將檢索到的文本區塊組建為注入 LLM 提示詞的上下文字串。
 
@@ -285,34 +302,34 @@ class RAGEngine:
         """
         max_chars = self._settings.rag_prompt_chunk_chars
         # 法規優先：法規在前，手冊在後，各自保留原始順序
-        paired = list(zip(docs, metas))
-        paired.sort(key=lambda x: (0 if self._is_regulation(x[1].get('source', '')) else 1))
+        paired = list(zip(docs, metas, strict=True))
+        paired.sort(
+            key=lambda x: 0 if self._is_regulation(x[1].get("source", "")) else 1
+        )
         docs = [p[0] for p in paired]
         metas = [p[1] for p in paired]
 
         parts: list[str] = []
         if chapter_header:
             parts.append(chapter_header)
-        for i, (doc, meta) in enumerate(zip(docs, metas)):
+        for i, (doc, meta) in enumerate(zip(docs, metas, strict=True)):
             truncated = self._truncate_at_boundary(doc, max_chars)
-            source = meta.get('source', '?')
+            source = meta.get("source", "?")
             # 去除副檔名；法規檔（N006 開頭）再去除編號前綴
-            display = source.rsplit('.', 1)[0]
+            display = source.rsplit(".", 1)[0]
             is_reg = self._is_regulation(source)
             if is_reg:
-                display = display.split('_', 1)[1]
-            article = meta.get('article', '')
+                display = display.split("_", 1)[1]
+            article = meta.get("article", "")
             tag = "法規" if is_reg else "參考"
             label = f"{display} {article}" if article else display
-            parts.append(
-                f"[資料 {i+1}]（{tag}：{label}）\n{truncated}"
-            )
+            parts.append(f"[資料 {i + 1}]（{tag}：{label}）\n{truncated}")
         return "\n\n".join(parts)
 
     @staticmethod
     def _build_source_list(
-        docs: list[str], metas: list[dict], dists: list[float]
-    ) -> list[dict]:
+        docs: list[str], metas: list[dict[str, Any]], dists: list[float]
+    ) -> list[dict[str, Any]]:
         """將檢索結果轉為前端顯示用的來源摘要清單。"""
         return [
             {
@@ -321,12 +338,12 @@ class RAGEngine:
                 "relevance": round(1 - dist, 3),
                 "excerpt": doc[:200] + "…" if len(doc) > 200 else doc,
             }
-            for doc, meta, dist in zip(docs, metas, dists)
+            for doc, meta, dist in zip(docs, metas, dists, strict=True)
         ]
 
     def _retrieve(
         self, question: str, top_k: int | None = None
-    ) -> tuple[str, list[dict]]:
+    ) -> tuple[str, list[dict[str, Any]]]:
         """對向量資料庫執行語意檢索，回傳 (上下文字串, 來源清單)。
 
         當 top_k 結果中有 2+ 筆來自同一章節時，自動擴展帶入該章所有條文。
@@ -347,6 +364,7 @@ class RAGEngine:
         chapters = [m.get("chapter", "") for m in metas if m.get("chapter")]
         if chapters:
             from collections import Counter
+
             ch_counts = Counter(chapters)
             dominant_ch, count = ch_counts.most_common(1)[0]
             if count >= 2 and dominant_ch:
@@ -356,17 +374,25 @@ class RAGEngine:
                 )
                 # 撈出同章所有條文
                 ch_results = self._collection.get(
-                    where={"$and": [
-                        {"chapter": {"$eq": dominant_ch}},
-                        {"source": {"$eq": ch_source}},
-                    ]},
+                    where={
+                        "$and": [
+                            {"chapter": {"$eq": dominant_ch}},
+                            {"source": {"$eq": ch_source}},
+                        ]
+                    },
                     include=["documents", "metadatas"],
                 )
                 # 用已檢索到的 article 集合做去重，擴展條文存入獨立清單
-                existing = {(d, m.get("article", "")) for d, m in zip(docs, metas)}
+                existing = {
+                    (d, m.get("article", "")) for d, m in zip(docs, metas, strict=True)
+                }
                 extra_docs: list[str] = []
-                extra_metas: list[dict] = []
-                for doc, meta in zip(ch_results["documents"], ch_results["metadatas"]):
+                extra_metas: list[dict[str, Any]] = []
+                for doc, meta in zip(
+                    ch_results["documents"],
+                    ch_results["metadatas"],
+                    strict=True,
+                ):
                     key = (doc, meta.get("article", ""))
                     if key not in existing:
                         extra_docs.append(doc)
@@ -378,7 +404,9 @@ class RAGEngine:
                 if len(extra_docs) > max_extra:
                     logger.info(
                         "Chapter cap: %d expanded → %d (keeping %d original)",
-                        len(extra_docs), max_extra, len(docs),
+                        len(extra_docs),
+                        max_extra,
+                        len(docs),
                     )
                     extra_docs = extra_docs[:max_extra]
                     extra_metas = extra_metas[:max_extra]
@@ -389,24 +417,32 @@ class RAGEngine:
 
                 # 按條號排序（有條號的在前，按數字排序）
                 def _article_sort_key(
-                    item: tuple[str, dict, float],
+                    item: tuple[str, dict[str, Any], float],
                 ) -> tuple[int, int]:
                     meta = item[1]
                     article = meta.get("article", "")
-                    m = re.search(r'(\d+)', article)
+                    m = re.search(r"(\d+)", article)
                     return (0, int(m.group(1))) if m else (1, 0)
 
-                combined = sorted(zip(docs, metas, dists), key=_article_sort_key)
+                combined = sorted(
+                    zip(docs, metas, dists, strict=True),
+                    key=_article_sort_key,
+                )
                 docs = [c[0] for c in combined]
                 metas = [c[1] for c in combined]
                 dists = [c[2] for c in combined]
 
                 # 章節標題
-                display_source = ch_source.rsplit('.', 1)[0]
-                if re.match(r'^N\d+_', display_source):
-                    display_source = display_source.split('_', 1)[1]
+                display_source = ch_source.rsplit(".", 1)[0]
+                if re.match(r"^N\d+_", display_source):
+                    display_source = display_source.split("_", 1)[1]
                 chapter_header = f"[以下為《{display_source}》{dominant_ch} 完整條文]"
-                logger.info("Chapter expansion: %s %s → %d chunks", ch_source, dominant_ch, len(docs))
+                logger.info(
+                    "Chapter expansion: %s %s → %d chunks",
+                    ch_source,
+                    dominant_ch,
+                    len(docs),
+                )
 
         context = self._build_prompt_context(docs, metas, chapter_header)
         sources = self._build_source_list(docs, metas, dists)
@@ -414,17 +450,21 @@ class RAGEngine:
 
     # -- 問答生成 -----------------------------------------------------------
     @staticmethod
-    def _build_qa_messages(context: str, question: str) -> list:
+    def _build_qa_messages(context: str, question: str) -> list[Any]:
         """組建傳送給 LLM 的系統提示與使用者問題訊息列表。"""
-        from langchain_core.messages import SystemMessage, HumanMessage
+        from langchain_core.messages import HumanMessage, SystemMessage
+
         return [
             SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=QA_PROMPT_TEMPLATE.format(
-                context=context, question=question,
-            )),
+            HumanMessage(
+                content=QA_PROMPT_TEMPLATE.format(
+                    context=context,
+                    question=question,
+                )
+            ),
         ]
 
-    def query(self, question: str, top_k: int | None = None) -> dict:
+    def query(self, question: str, top_k: int | None = None) -> dict[str, Any]:
         """檢索相關文本並透過 LLM 產生回答；LLM 離線時自動降級為純檢索模式。"""
         context, sources = self._retrieve(question, top_k)
         messages = self._build_qa_messages(context, question)
@@ -433,18 +473,23 @@ class RAGEngine:
             response = self.llm.invoke(messages)
             answer = response.content if hasattr(response, "content") else str(response)
             return {
-                "answer": answer, "sources": sources,
-                "question": question, "degraded": False,
+                "answer": answer,
+                "sources": sources,
+                "question": question,
+                "degraded": False,
             }
         except Exception as e:
             logger.warning("LLM unavailable, falling back to retrieval-only: %s", e)
             return {
                 "answer": self._build_degraded_answer(sources),
                 "sources": sources,
-                "question": question, "degraded": True,
+                "question": question,
+                "degraded": True,
             }
 
-    def query_stream(self, question: str, top_k: int | None = None):
+    def query_stream(
+        self, question: str, top_k: int | None = None
+    ) -> Generator[dict[str, Any], None, None]:
         """以串流方式產生 SSE 事件：token → sources → done（或 error 降級）。"""
         context, sources = self._retrieve(question, top_k)
         messages = self._build_qa_messages(context, question)
@@ -454,19 +499,29 @@ class RAGEngine:
                 content = chunk.content if hasattr(chunk, "content") else str(chunk)
                 if content:
                     yield {"event": "token", "data": {"token": content}}
-            yield {"event": "sources", "data": {
-                "sources": sources, "question": question, "degraded": False,
-            }}
+            yield {
+                "event": "sources",
+                "data": {
+                    "sources": sources,
+                    "question": question,
+                    "degraded": False,
+                },
+            }
         except Exception as e:
             logger.warning("LLM stream failed, falling back to retrieval-only: %s", e)
-            yield {"event": "error", "data": {
-                "error": "AI 推論服務暫時無法使用", "degraded": True,
-                "fallback_answer": self._build_degraded_answer(sources),
-                "sources": sources, "question": question,
-            }}
+            yield {
+                "event": "error",
+                "data": {
+                    "error": "AI 推論服務暫時無法使用",
+                    "degraded": True,
+                    "fallback_answer": self._build_degraded_answer(sources),
+                    "sources": sources,
+                    "question": question,
+                },
+            }
         yield {"event": "done", "data": {}}
 
-    def _build_degraded_answer(self, sources: list[dict]) -> str:
+    def _build_degraded_answer(self, sources: list[dict[str, Any]]) -> str:
         """LLM 離線時，組建純檢索結果的降級回答。"""
         if not sources:
             return (
@@ -478,22 +533,19 @@ class RAGEngine:
         lines = [
             "⚠️ **系統目前以離線模式運作（AI 推論服務暫時無法連線）**",
             "",
-            "為了不耽誤現場查詢需求，以下直接提供檢索到的相關法規原文，"
-            "請自行參閱：",
+            "為了不耽誤現場查詢需求，以下直接提供檢索到的相關法規原文，請自行參閱：",
             "",
         ]
         for i, s in enumerate(sources, 1):
             lines.append(
                 f"**{i}. {s['source']}** (p.{s['page']}, "
-                f"相關度 {int(s['relevance']*100)}%)"
+                f"相關度 {int(s['relevance'] * 100)}%)"
             )
             lines.append(s["excerpt"])
             lines.append("")
 
         lines.append("---")
-        lines.append(
-            "💡 待 AI 服務恢復後，可重新提問以取得整合性回答。"
-        )
+        lines.append("💡 待 AI 服務恢復後，可重新提問以取得整合性回答。")
         return "\n".join(lines)
 
     # -- 工具方法 -----------------------------------------------------------

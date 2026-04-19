@@ -56,7 +56,9 @@ class Settings:
             ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
             ollama_num_ctx=_env_int("OLLAMA_NUM_CTX", "8192"),
             llm_temperature=_env_float("LLM_TEMPERATURE", "0.1"),
-            embedding_model=os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base"),
+            embedding_model=os.getenv(
+                "EMBEDDING_MODEL", "intfloat/multilingual-e5-base"
+            ),
             rag_top_k=_env_int("RAG_TOP_K", "5"),
             rag_prompt_chunk_chars=_env_int("RAG_PROMPT_CHUNK_CHARS", "600"),
             max_chapter_articles=_env_int("MAX_CHAPTER_ARTICLES", "8"),
@@ -79,9 +81,7 @@ def _env_int(name: str, default: str) -> int:
     try:
         return int(val)
     except ValueError:
-        raise ValueError(
-            f"環境變數 {name}={val!r} 必須是整數"
-        ) from None
+        raise ValueError(f"環境變數 {name}={val!r} 必須是整數") from None
 
 
 def _env_float(name: str, default: str) -> float:
@@ -90,9 +90,7 @@ def _env_float(name: str, default: str) -> float:
     try:
         return float(val)
     except ValueError:
-        raise ValueError(
-            f"環境變數 {name}={val!r} 必須是數字"
-        ) from None
+        raise ValueError(f"環境變數 {name}={val!r} 必須是數字") from None
 
 
 def setup_logging() -> None:

@@ -45,7 +45,6 @@ import sys
 import time
 import zipfile
 from pathlib import Path
-from typing import Optional
 
 import requests
 
@@ -63,7 +62,7 @@ log = logging.getLogger("fetch_laws")
 # Config
 # ---------------------------------------------------------------------------
 # 官方 API：整包 ZIP 含所有法規。下載一次、解壓、取出要的 pcode
-MOJ_LAW_API_URL = "https://law.moj.gov.tw/api/Ch/Law/JSON"    # 法律
+MOJ_LAW_API_URL = "https://law.moj.gov.tw/api/Ch/Law/JSON"  # 法律
 MOJ_ORDER_API_URL = "https://law.moj.gov.tw/api/Ch/Order/JSON"  # 法規命令/行政規則
 MOJ_API_URL = MOJ_LAW_API_URL  # kept for log messages
 
@@ -91,7 +90,7 @@ RETRY_DELAY = 3
 # ---------------------------------------------------------------------------
 # PCode extraction helper
 # ---------------------------------------------------------------------------
-def get_pcode(law: dict) -> Optional[str]:
+def get_pcode(law: dict) -> str | None:
     """Extract PCode from a law dict, checking direct fields then LawURL."""
     pcode = law.get("PCode") or law.get("pcode")
     if pcode:
@@ -129,17 +128,21 @@ def _normalize_articles(raw_articles: list[dict]) -> list[dict]:
     articles: list[dict] = []
     for art in raw_articles:
         if "編章節" in art:
-            articles.append({
-                "ArticleType": "C",
-                "ArticleNo": "",
-                "ArticleContent": art["編章節"],
-            })
+            articles.append(
+                {
+                    "ArticleType": "C",
+                    "ArticleNo": "",
+                    "ArticleContent": art["編章節"],
+                }
+            )
         else:
-            articles.append({
-                "ArticleType": "A",
-                "ArticleNo": art.get("條號", ""),
-                "ArticleContent": art.get("條文內容", ""),
-            })
+            articles.append(
+                {
+                    "ArticleType": "A",
+                    "ArticleNo": art.get("條號", ""),
+                    "ArticleContent": art.get("條文內容", ""),
+                }
+            )
     return articles
 
 
@@ -158,7 +161,7 @@ def normalize_law(law: dict) -> dict:
 def http_get(url: str, *, binary: bool = False, retries: int = 3):
     """GET with retry logic."""
     headers = {"User-Agent": USER_AGENT, "Accept": "*/*"}
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
 
     for attempt in range(1, retries + 1):
         try:
@@ -214,7 +217,7 @@ def filter_by_pcodes(all_laws: list[dict], pcodes: list[str]) -> list[dict]:
         if get_pcode(law) in wanted:
             out.append(law)
 
-    found_pcodes = {get_pcode(l) for l in out}
+    found_pcodes = {get_pcode(law) for law in out}
     missing = wanted - found_pcodes
     if missing:
         log.warning("  Not found in archive: %s", ", ".join(sorted(missing)))
@@ -225,7 +228,7 @@ def filter_by_pcodes(all_laws: list[dict], pcodes: list[str]) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Source B: Mirror (single-law JSON)
 # ---------------------------------------------------------------------------
-def fetch_law_from_mirror(pcode: str) -> Optional[dict]:
+def fetch_law_from_mirror(pcode: str) -> dict | None:
     """Fetch a single law from the kong0107 mirror."""
     url = f"{MIRROR_BASE}/{pcode}.json"
     log.info("  Fetching %s from mirror", pcode)
@@ -245,7 +248,9 @@ def _format_law_header(law: dict) -> list[str]:
     name = (law.get("LawName") or law.get("lawName") or "未知法規").strip()
     category = (law.get("LawCategory") or law.get("lawCategory") or "").strip()
     modified = (law.get("LawModifiedDate") or law.get("lawModifiedDate") or "").strip()
-    effective = (law.get("LawEffectiveDate") or law.get("lawEffectiveDate") or "").strip()
+    effective = (
+        law.get("LawEffectiveDate") or law.get("lawEffectiveDate") or ""
+    ).strip()
 
     lines: list[str] = [f"# {name}", ""]
     if category:
@@ -264,15 +269,16 @@ def _format_article(art: dict) -> list[str]:
 
     if art_type == "C":
         chapter = (
-            art.get("ArticleChapter") or art.get("ArticleContent")
-            or art.get("articleChapter") or art.get("articleContent") or ""
+            art.get("ArticleChapter")
+            or art.get("ArticleContent")
+            or art.get("articleChapter")
+            or art.get("articleContent")
+            or ""
         ).strip()
         return ["", f"## {chapter}", ""] if chapter else []
 
     no = (art.get("ArticleNo") or art.get("articleNo") or "").strip()
-    content = (
-        art.get("ArticleContent") or art.get("articleContent") or ""
-    ).strip()
+    content = (art.get("ArticleContent") or art.get("articleContent") or "").strip()
     if not content:
         return []
     content = re.sub(r"[ \t]+", " ", content)
@@ -290,8 +296,7 @@ def format_law_as_text(law: dict) -> str:
     lines = _format_law_header(law)
 
     articles = (
-        law.get("LawArticles") or law.get("lawArticles")
-        or law.get("articles") or []
+        law.get("LawArticles") or law.get("lawArticles") or law.get("articles") or []
     )
     if not articles:
         lines.append("（本法規無條文資料）")
