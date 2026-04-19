@@ -58,10 +58,10 @@ window.SafeChat.useHelpers = function useHelpers({ reactive, nextTick }) {
 
   /**
    * 帶 API Key 的 fetch 包裝。
-   * 若 localStorage 中有 safechat_api_key，自動附加 Authorization 標頭。
+   * 若 sessionStorage 中有 safechat_api_key，自動附加 Authorization 標頭。
    */
   function fetchWithAuth(url, options = {}) {
-    const apiKey = localStorage.getItem('safechat_api_key')
+    const apiKey = sessionStorage.getItem('safechat_api_key')
     if (apiKey) {
       const headers = new Headers(options.headers || {})
       headers.set('Authorization', `Bearer ${apiKey}`)
