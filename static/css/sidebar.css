@@ -1,0 +1,126 @@
+/*
+ * 側邊欄 — 主結構、檔案上傳區、文件列表、快速提問、重設按鈕
+ */
+
+/* 主結構 */
+.app-body { display: flex; flex: 1; overflow: hidden; }
+
+.sidebar {
+  width: 320px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.sidebar-section { padding: 1.25rem; border-bottom: 1px solid var(--border); }
+
+.sidebar-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+
+/* 檔案上傳拖放區 */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.upload-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+
+.upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+
+.upload-label { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+.upload-label strong { color: var(--accent); font-weight: 600; }
+
+.uploading-spinner {
+  display: inline-block;
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 已匯入文件列表 */
+.doc-list {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.doc-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  animation: slideIn 0.3s ease;
+}
+
+.doc-icon { font-size: 1.1rem; }
+
+.doc-name {
+  flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 快速提問按鈕 */
+.quick-questions { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.quick-q {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: var(--font-body);
+  line-height: 1.4;
+}
+
+.quick-q:hover { border-color: var(--accent); background: var(--accent-dim); }
+
+/* 底部重設按鈕 */
+.sidebar-actions { padding: 1rem 1.25rem; margin-top: auto; }
+
+.btn-reset {
+  width: 100%;
+  background: var(--danger-dim);
+  color: var(--danger);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: var(--radius);
+  padding: 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: var(--transition);
+}
+
+.btn-reset:hover { background: rgba(239,68,68,0.2); }

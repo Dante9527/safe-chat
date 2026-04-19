@@ -1,0 +1,60 @@
+/*
+ * 頂部導覽列 — Logo、健康狀態燈號
+ */
+
+.app-header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 0 1.5rem;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-logo { display: flex; align-items: center; gap: 0.75rem; }
+
+.logo-icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-size: 1.2rem;
+  color: #000;
+  font-weight: 900;
+}
+
+.logo-text { font-weight: 700; font-size: 1.1rem; letter-spacing: 0.02em; }
+.logo-text span { color: var(--accent); }
+
+.header-stats {
+  display: flex; gap: 1.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.stat-badge { display: flex; align-items: center; gap: 0.4rem; }
+
+.stat-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse-dot 2s infinite;
+}
+
+.stat-dot.warn { background: var(--accent); }
+.stat-dot.error { background: var(--danger); animation: pulse-error 1s infinite; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes pulse-error {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}

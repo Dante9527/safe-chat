@@ -1,0 +1,24 @@
+/*
+ * 右上角通知提示（Toast）
+ */
+
+.toast-container {
+  position: fixed;
+  top: 72px; right: 1.5rem;
+  z-index: 200;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+.toast {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.7rem 1rem;
+  font-size: 0.82rem;
+  box-shadow: var(--shadow);
+  animation: slideIn 0.3s ease, fadeOut 0.4s ease 3s forwards;
+  max-width: 340px;
+}
+
+.toast.error { border-left-color: var(--danger); }

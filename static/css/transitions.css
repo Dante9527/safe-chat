@@ -1,0 +1,36 @@
+/*
+ * Vue 過渡動畫、RWD 響應式、捲軸樣式
+ */
+
+/* Vue transitions */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.slide-enter-active { animation: slideIn 0.35s ease; }
+
+.list-enter-active { animation: slideIn 0.3s ease; }
+.list-leave-active { transition: opacity 0.2s ease; }
+.list-leave-to { opacity: 0; }
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
+/* RWD — 手機版（768px 以下隱藏側邊欄） */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .chat-messages { padding: 1rem; }
+  .chat-input-bar { padding: 0.75rem 1rem; }
+  .header-stats { display: none; }
+}
+
+/* 自訂捲軸（WebKit 瀏覽器） */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
