@@ -1,0 +1,12 @@
+# SafeChat — Heavy / stable dependencies (rarely change)
+# Pinned separately so Docker can cache this layer independently.
+# ============================================================
+
+# PyTorch CPU-only (safe-chat does NOT do GPU inference — Ollama handles that)
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Embeddings (pulls in torch, transformers, tokenizers)
+sentence-transformers==3.3.1
+
+# Vector store (pulls in many native extensions)
+chromadb==0.5.23
