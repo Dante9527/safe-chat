@@ -131,7 +131,7 @@ uvicorn app.main:app --reload
 
 | 層級 | 技術 | 選用原因 |
 |------|------|---------|
-| 前端 | **Vue 3 (Composition API)** | 反應式狀態、動畫過渡、CDN 免 build |
+| 前端 | **Vue 3 (Composition API)** | 反應式狀態、動畫過渡、本地載入免 build |
 | 後端 | **FastAPI** | 高效能、async、自動 Swagger docs |
 | RAG | **LangChain** | Pipeline 標準化、多 LLM 後端 |
 | 向量庫 | **ChromaDB** | 嵌入式、零部署、cosine search |

@@ -138,7 +138,7 @@
 1. 向 IT 索取 API Key
 2. 在瀏覽器的開發者工具 Console 輸入：
    ```
-   localStorage.setItem('safechat_api_key', '你的API Key')
+   sessionStorage.setItem('safechat_api_key', '你的API Key')
    ```
 3. 重新整理頁面即可
 

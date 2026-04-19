@@ -200,7 +200,7 @@ curl -H "Authorization: Bearer <你的API_KEY>" http://localhost:8000/api/stats
 
 **前端使用者：** 在瀏覽器 Console 設定 API Key：
 ```javascript
-localStorage.setItem('safechat_api_key', '你的API_KEY')
+sessionStorage.setItem('safechat_api_key', '你的API_KEY')
 ```
 然後重新整理頁面。
 
