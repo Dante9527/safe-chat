@@ -129,11 +129,13 @@
                   上傳營建工安法規、施工安全手冊等 PDF 文件，
                   <br />
                   即可用自然語言查詢安全規範、危害預防措施、事故通報流程。
-                  <br />
-                  <br />
-                  <strong style="color: var(--accent)">
-                    ← 請先從左側匯入文件，再開始提問
-                  </strong>
+                  <template v-if="totalChunks === 0">
+                    <br />
+                    <br />
+                    <strong style="color: var(--accent)">
+                      ← 請先從左側匯入文件，再開始提問
+                    </strong>
+                  </template>
                 </p>
               </div>
             </transition>
