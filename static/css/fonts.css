@@ -1,0 +1,25 @@
+/* Noto Sans TC — 本地自行託管（Variable Font，支援 wght 100-900） */
+@font-face {
+  font-family: 'Noto Sans TC';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../fonts/NotoSansTC-Variable.woff2') format('woff2');
+}
+
+/* JetBrains Mono — 本地自行託管 */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/JetBrainsMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/JetBrainsMono-Medium.woff2') format('woff2');
+}
