@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SafeChat — 啟動中</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        background: #0f1115;
+        color: #e8eaed;
+        font-family: -apple-system, 'PingFang TC', sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+      .container {
+        text-align: center;
+        max-width: 400px;
+        padding: 2rem;
+      }
+      .icon { font-size: 3rem; margin-bottom: 1.5rem; }
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #f59e0b;
+      }
+      p {
+        color: #9ca3af;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+      }
+      .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid #333a45;
+        border-top-color: #f59e0b;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 1rem;
+      }
+      .status {
+        font-size: 0.85rem;
+        color: #6b7280;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">&#x26d1;</div>
+      <h1>SafeChat</h1>
+      <div class="spinner"></div>
+      <p>正在啟動，載入 AI 模型中&#x2026;</p>
+      <div class="status" id="status">準備中</div>
+    </div>
+    <script>
+      const el = document.getElementById('status')
+      let dots = 0
+      setInterval(() => {
+        dots = (dots + 1) % 4
+        el.textContent = '準備中' + '.'.repeat(dots)
+      }, 500)
+
+      setInterval(() => {
+        fetch('/api/health')
+          .then(r => { if (r.ok) location.reload() })
+          .catch(() => {})
+      }, 5000)
+    </script>
+  </body>
+</html>

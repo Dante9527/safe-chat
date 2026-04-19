@@ -99,6 +99,8 @@ def setup_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
     )
+    # ChromaDB posthog 套件有已知 bug，即使停用遙測仍會輸出無害錯誤，直接靜默
+    logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.CRITICAL)
 
 
 _settings: Settings | None = None

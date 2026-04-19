@@ -60,27 +60,42 @@ settings = init_settings()
 limiter = Limiter(key_func=get_remote_address)
 
 # ---------------------------------------------------------------------------
-# RAG 引擎 — 透過 lifespan 預載，避免首次請求冷啟動延遲。
+# RAG 引擎 — 背景載入，啟動期間先顯示載入頁面。
 # ---------------------------------------------------------------------------
 rag: RAGEngine | None = None
+_rag_ready = False
+
+_LOADING_HTML = (
+    Path(__file__).resolve().parent.parent / "templates" / "loading.html"
+).read_text(encoding="utf-8")
+
+
+def _init_rag_sync() -> None:
+    """在獨立 thread 中初始化 RAG 引擎。"""
+    global rag, _rag_ready
+    try:
+        s = get_settings()
+        logger.info("啟動中 — 預載 RAG 引擎（SentenceTransformer + ChromaDB）…")
+        rag = RAGEngine(persist_dir=str(BASE_DIR / "data" / "chroma_db"), settings=s)
+        _ = rag.llm  # 觸發 LLM 客戶端初始化
+        _rag_ready = True
+        logger.info("RAG 引擎就緒 — 所有元件已載入，開始接受請求。")
+    except Exception:
+        logger.exception("RAG 引擎初始化失敗")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """啟動前預載所有重型元件，確保首次請求不會冷啟動。"""
-    global rag
-    s = get_settings()
-    logger.info("啟動中 — 預載 RAG 引擎（SentenceTransformer + ChromaDB）…")
-    rag = RAGEngine(persist_dir=str(BASE_DIR / "data" / "chroma_db"), settings=s)
-    _ = rag.llm  # 觸發 LLM 客戶端初始化
-    logger.info("RAG 引擎就緒 — 所有元件已載入，開始接受請求。")
+    """啟動時在獨立 thread 載入模型，不阻塞 HTTP 服務。"""
+    import threading
+    threading.Thread(target=_init_rag_sync, daemon=True).start()
     yield
 
 
 def get_rag() -> RAGEngine:
     """取得全域 RAG 引擎實例。"""
-    if rag is None:
-        raise RuntimeError("RAGEngine not initialized — server is still starting up")
+    if not _rag_ready or rag is None:
+        raise HTTPException(503, "SafeChat 正在啟動中，請稍候再試。")
     return rag
 
 
@@ -171,9 +186,11 @@ class AnswerResponse(BaseModel):
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
-    """提供主聊天介面 HTML，靜態資源路徑附加版本號以避免快取。"""
+    """啟動期間回傳載入頁面，就緒後回傳主介面（附加靜態資源版本號）。"""
+    if not _rag_ready:
+        return HTMLResponse(content=_LOADING_HTML)
     html = (BASE_DIR / "templates" / "index.html").read_text(encoding="utf-8")
-    html = html.replace("/static/", f"/static/").replace(
+    html = html.replace(
         '.css"', f'.css?v={_STATIC_VERSION}"'
     ).replace(
         '.js"', f'.js?v={_STATIC_VERSION}"'
@@ -312,10 +329,14 @@ async def knowledge_base_stats(request: Request) -> KBStats:
     )
 
 
-@app.get("/api/health")
-@limiter.limit(settings.rate_limit)
-async def health_check(request: Request) -> HealthResult:
-    """系統健康檢查 — 回傳 LLM、向量資料庫、磁碟三項狀態。"""
+@app.get("/api/health", response_model=None)
+async def health_check(request: Request) -> HealthResult | JSONResponse:
+    """系統健康檢查 — 啟動期間回傳 503，就緒後回傳完整狀態。"""
+    if not _rag_ready:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "starting", "message": "AI 模型載入中，請稍候…"},
+        )
     return health_checks.aggregate(get_settings(), get_rag(), UPLOAD_DIR)
 
 
