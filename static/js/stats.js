@@ -19,7 +19,9 @@ window.SafeChat.useStats = function useStats({ ref, reactive, fetchWithAuth }) {
       const data = await res.json()
       totalChunks.value = data.total_chunks
       documents.splice(0, documents.length, ...data.documents)
-    } catch {}
+    } catch (_e) {
+      /* stats refresh is non-critical */
+    }
   }
 
   return { totalChunks, documents, refreshStats }

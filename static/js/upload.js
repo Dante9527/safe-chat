@@ -8,7 +8,12 @@ window.SafeChat = window.SafeChat || {}
  * 建立檔案上傳相關邏輯。
  * @param {object} deps - Vue ref、showToast、refreshStats
  */
-window.SafeChat.useUpload = function useUpload({ ref, showToast, refreshStats, fetchWithAuth }) {
+window.SafeChat.useUpload = function useUpload({
+  ref,
+  showToast,
+  refreshStats,
+  fetchWithAuth,
+}) {
   const isUploading = ref(false)
   const isDragging = ref(false)
   const fileInput = ref(null)
@@ -16,13 +21,17 @@ window.SafeChat.useUpload = function useUpload({ ref, showToast, refreshStats, f
   /** 拖放事件處理 */
   function onDrop(e) {
     isDragging.value = false
-    if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0])
+    if (e.dataTransfer.files.length) {
+      uploadFile(e.dataTransfer.files[0])
+    }
   }
 
   /** 選檔事件處理 */
   function onFileSelect() {
     const f = fileInput.value?.files
-    if (f && f.length) uploadFile(f[0])
+    if (f && f.length) {
+      uploadFile(f[0])
+    }
   }
 
   /** 上傳單一檔案至 /api/upload */
@@ -35,14 +44,18 @@ window.SafeChat.useUpload = function useUpload({ ref, showToast, refreshStats, f
     try {
       const res = await fetchWithAuth('/api/upload', { method: 'POST', body: form })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Upload failed')
+      if (!res.ok) {
+        throw new Error(data.detail || 'Upload failed')
+      }
       showToast(data.message)
       await refreshStats()
     } catch (err) {
       showToast(`上傳失敗：${err.message}`, true)
     } finally {
       isUploading.value = false
-      if (fileInput.value) fileInput.value.value = ''
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
     }
   }
 

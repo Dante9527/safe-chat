@@ -24,7 +24,11 @@ createApp({
     // 組合各模組
     const helpers = useHelpers({ reactive, nextTick })
     const stats = useStats({ ref, reactive, fetchWithAuth: helpers.fetchWithAuth })
-    const health = useHealth({ reactive, computed, fetchWithAuth: helpers.fetchWithAuth })
+    const health = useHealth({
+      reactive,
+      computed,
+      fetchWithAuth: helpers.fetchWithAuth,
+    })
 
     const upload = useUpload({
       ref,
@@ -34,7 +38,9 @@ createApp({
     })
 
     const chat = useChat({
-      ref, reactive, nextTick,
+      ref,
+      reactive,
+      nextTick,
       showToast: helpers.showToast,
       scrollBottom: helpers.scrollBottom,
       refreshHealth: health.refreshHealth,
@@ -56,9 +62,13 @@ createApp({
 
     // 清空知識庫（需管理員 token）
     async function resetKB() {
-      if (!confirm('確定要清空所有已匯入的文件？')) return
+      if (!confirm('確定要清空所有已匯入的文件？')) {
+        return
+      }
       const token = prompt('請輸入管理員 token：')
-      if (!token) return
+      if (!token) {
+        return
+      }
       try {
         const res = await helpers.fetchWithAuth('/api/reset', {
           method: 'DELETE',
@@ -77,7 +87,8 @@ createApp({
 
     return {
       // Template refs
-      chatContainer, questionInput,
+      chatContainer,
+      questionInput,
       // 快速提問
       quickQuestions,
       // Helpers

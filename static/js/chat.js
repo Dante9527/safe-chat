@@ -9,9 +9,15 @@ window.SafeChat = window.SafeChat || {}
  * @param {object} deps - Vue 工具與外部函式
  */
 window.SafeChat.useChat = function useChat({
-  ref, reactive, nextTick,
-  showToast, scrollBottom, refreshHealth, fetchWithAuth,
-  chatContainer, questionInput,
+  ref,
+  reactive,
+  nextTick,
+  showToast,
+  scrollBottom,
+  refreshHealth,
+  fetchWithAuth,
+  chatContainer,
+  questionInput,
 }) {
   const messages = reactive([])
   const question = ref('')
@@ -21,14 +27,18 @@ window.SafeChat.useChat = function useChat({
   /** 處理單一 SSE 事件（token / sources / error） */
   function handleSSEEvent(event, data, botMsg) {
     if (event === 'token') {
-      if (isLoading.value) isLoading.value = false
+      if (isLoading.value) {
+        isLoading.value = false
+      }
       botMsg.text += data.token
       scrollBottom(chatContainer)
     } else if (event === 'sources') {
       botMsg.sources = data.sources
       botMsg.degraded = data.degraded
     } else if (event === 'error') {
-      if (isLoading.value) isLoading.value = false
+      if (isLoading.value) {
+        isLoading.value = false
+      }
       botMsg.text = data.fallback_answer
       botMsg.sources = data.sources
       botMsg.degraded = data.degraded
@@ -48,7 +58,9 @@ window.SafeChat.useChat = function useChat({
 
     while (true) {
       const { done, value } = await reader.read()
-      if (done) break
+      if (done) {
+        break
+      }
 
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
@@ -67,13 +79,23 @@ window.SafeChat.useChat = function useChat({
   /** 送出提問，透過 SSE 串流接收回答 */
   async function sendQuestion() {
     const q = question.value.trim()
-    if (!q || isLoading.value) return
+    if (!q || isLoading.value) {
+      return
+    }
 
     messages.push({ id: ++msgId, role: 'user', text: q, sources: null })
     question.value = ''
-    if (questionInput.value) questionInput.value.style.height = 'auto'
+    if (questionInput.value) {
+      questionInput.value.style.height = 'auto'
+    }
 
-    messages.push({ id: ++msgId, role: 'bot', text: '', sources: null, degraded: false })
+    messages.push({
+      id: ++msgId,
+      role: 'bot',
+      text: '',
+      sources: null,
+      degraded: false,
+    })
     const botMsg = messages[messages.length - 1]
     isLoading.value = true
     await scrollBottom(chatContainer)

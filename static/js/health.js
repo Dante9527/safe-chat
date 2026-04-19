@@ -27,19 +27,31 @@ window.SafeChat.useHealth = function useHealth({ reactive, computed, fetchWithAu
 
   /** 燈號 CSS class（綠 / 黃 / 紅） */
   const healthDotClass = computed(() => {
-    if (health.status === 'ok') return ''
-    if (health.status === 'degraded') return 'warn'
+    if (health.status === 'ok') {
+      return ''
+    }
+    if (health.status === 'degraded') {
+      return 'warn'
+    }
     return 'error'
   })
 
   /** 燈號旁顯示的文字標籤 */
   const healthLabel = computed(() => {
-    if (health.status === 'ok') return 'RAG Engine'
+    if (health.status === 'ok') {
+      return 'RAG Engine'
+    }
     if (health.status === 'degraded') {
       const c = health.components || {}
-      if (c.llm && !c.llm.ok) return 'AI 離線'
-      if (c.vector && !c.vector.ok) return '向量庫異常'
-      if (c.disk && !c.disk.ok) return '磁碟空間不足'
+      if (c.llm && !c.llm.ok) {
+        return 'AI 離線'
+      }
+      if (c.vector && !c.vector.ok) {
+        return '向量庫異常'
+      }
+      if (c.disk && !c.disk.ok) {
+        return '磁碟空間不足'
+      }
       return '降級模式'
     }
     return '連線中斷'
@@ -50,13 +62,19 @@ window.SafeChat.useHealth = function useHealth({ reactive, computed, fetchWithAu
     const c = health.components || {}
     const lines = []
     if (c.llm) {
-      lines.push(`LLM (${c.llm.backend}/${c.llm.model}): ${c.llm.ok ? '✓' : '✗ ' + (c.llm.error || '')}`)
+      lines.push(
+        `LLM (${c.llm.backend}/${c.llm.model}): ${c.llm.ok ? '✓' : '✗ ' + (c.llm.error || '')}`,
+      )
     }
     if (c.vector) {
-      lines.push(`Vector store: ${c.vector.ok ? '✓ ' + c.vector.chunks + ' chunks' : '✗'}`)
+      lines.push(
+        `Vector store: ${c.vector.ok ? '✓ ' + c.vector.chunks + ' chunks' : '✗'}`,
+      )
     }
     if (c.disk) {
-      lines.push(`Disk: ${c.disk.ok ? '✓ ' + c.disk.free_mb + ' MB free' : '✗ low space'}`)
+      lines.push(
+        `Disk: ${c.disk.ok ? '✓ ' + c.disk.free_mb + ' MB free' : '✗ low space'}`,
+      )
     }
     return lines.join('\n') || '狀態未知'
   })
@@ -69,11 +87,18 @@ window.SafeChat.useHealth = function useHealth({ reactive, computed, fetchWithAu
 
   /** 停止定期輪詢 */
   function stopPolling() {
-    if (healthTimer) clearInterval(healthTimer)
+    if (healthTimer) {
+      clearInterval(healthTimer)
+    }
   }
 
   return {
-    health, healthDotClass, healthLabel, healthTooltip,
-    refreshHealth, startPolling, stopPolling,
+    health,
+    healthDotClass,
+    healthLabel,
+    healthTooltip,
+    refreshHealth,
+    startPolling,
+    stopPolling,
   }
 }

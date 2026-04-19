@@ -10,31 +10,36 @@
   --bg-input: #2a2f38;
   --border: #333a45;
   --border-focus: #f59e0b;
-
   --text-primary: #e8eaed;
   --text-secondary: #9ca3af;
   --text-muted: #6b7280;
-
   --accent: #f59e0b;
   --accent-hover: #fbbf24;
-  --accent-dim: rgba(245, 158, 11, 0.12);
+  --accent-dim: rgb(245 158 11 / 12%);
   --danger: #ef4444;
-  --danger-dim: rgba(239, 68, 68, 0.12);
+  --danger-dim: rgb(239 68 68 / 12%);
   --success: #22c55e;
   --info: #3b82f6;
-  --info-dim: rgba(59, 130, 246, 0.12);
-
+  --info-dim: rgb(59 130 246 / 12%);
   --radius: 10px;
   --radius-lg: 16px;
-  --shadow: 0 4px 24px rgba(0,0,0,0.35);
+  --shadow: 0 4px 24px rgb(0 0 0 / 35%);
   --transition: 0.2s ease;
-
   --font-body: 'Noto Sans TC', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+}
 
 body {
   font-family: var(--font-body);
@@ -46,6 +51,7 @@ body {
   flex-direction: column;
 }
 
+/* stylelint-disable-next-line selector-max-id -- Vue mount point */
 #app {
   flex: 1;
   display: flex;

@@ -17,29 +17,36 @@ window.SafeChat.useHelpers = function useHelpers({ reactive, nextTick }) {
     const id = ++toastId
     toasts.push({ id, message, isError })
     setTimeout(() => {
-      const idx = toasts.findIndex(t => t.id === id)
-      if (idx !== -1) toasts.splice(idx, 1)
+      const idx = toasts.findIndex((t) => t.id === id)
+      if (idx !== -1) {
+        toasts.splice(idx, 1)
+      }
     }, 3500)
   }
 
   /** 簡易 Markdown → HTML（粗體、行內碼、換行） */
   function renderMarkdown(text) {
-    if (!text) return ''
+    if (!text) {
+      return ''
+    }
     return text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`(.+?)`/g,
-        '<code style="background:var(--bg-input);padding:0.1em 0.35em;border-radius:4px;font-family:var(--font-mono);font-size:0.85em;">$1</code>')
+      .replace(
+        /`(.+?)`/g,
+        '<code style="background:var(--bg-input);padding:0.1em 0.35em;border-radius:4px;font-family:var(--font-mono);font-size:0.85em;">$1</code>',
+      )
       .replace(/\n/g, '<br>')
   }
 
   /** 對話區自動捲到底部 */
   async function scrollBottom(chatContainer) {
     await nextTick()
-    if (chatContainer.value)
+    if (chatContainer.value) {
       chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    }
   }
 
   /** 輸入框自動調整高度 */

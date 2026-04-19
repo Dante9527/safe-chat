@@ -1,210 +1,231 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SafeChat — 工地安全 AI 助理</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/tokens.css">
-<link rel="stylesheet" href="/static/css/header.css">
-<link rel="stylesheet" href="/static/css/sidebar.css">
-<link rel="stylesheet" href="/static/css/chat.css">
-<link rel="stylesheet" href="/static/css/input.css">
-<link rel="stylesheet" href="/static/css/toast.css">
-<link rel="stylesheet" href="/static/css/transitions.css">
-</head>
-<body>
-
-<!-- ================================================================ -->
-<!-- Vue 3 App                                                         -->
-<!-- ================================================================ -->
-<div id="app">
-
-  <!-- Header -->
-  <header class="app-header">
-    <div class="app-logo">
-      <div class="logo-icon">⛑</div>
-      <div class="logo-text">Safe<span>Chat</span></div>
-    </div>
-    <div class="header-stats">
-      <div class="stat-badge" :title="healthTooltip">
-        <div class="stat-dot" :class="healthDotClass"></div>
-        <span>{{ healthLabel }}</span>
-      </div>
-      <div class="stat-badge">Chunks: {{ totalChunks }}</div>
-    </div>
-  </header>
-
-  <!-- Body -->
-  <main class="app-body">
-
-    <!-- Sidebar -->
-    <aside class="sidebar">
-
-      <!-- Upload -->
-      <div class="sidebar-section">
-        <div class="sidebar-title">📂 文件匯入</div>
-        <div
-          class="upload-zone"
-          :class="{ dragover: isDragging }"
-          @dragover.prevent="isDragging = true"
-          @dragleave="isDragging = false"
-          @drop.prevent="onDrop"
-        >
-          <input
-            type="file"
-            ref="fileInput"
-            accept=".pdf,.txt,.md"
-            @change="onFileSelect"
-          />
-          <div class="upload-icon">
-            <span v-if="isUploading" class="uploading-spinner"></span>
-            <span v-else>📄</span>
-          </div>
-          <div class="upload-label">
-            <template v-if="isUploading">正在匯入…</template>
-            <template v-else>拖曳或<strong>點擊上傳</strong><br>支援 PDF / TXT / MD</template>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SafeChat — 工地安全 AI 助理</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/header.css" />
+    <link rel="stylesheet" href="/static/css/sidebar.css" />
+    <link rel="stylesheet" href="/static/css/chat.css" />
+    <link rel="stylesheet" href="/static/css/input.css" />
+    <link rel="stylesheet" href="/static/css/toast.css" />
+    <link rel="stylesheet" href="/static/css/transitions.css" />
+  </head>
+  <body>
+    <!-- ================================================================ -->
+    <!-- Vue 3 App                                                         -->
+    <!-- ================================================================ -->
+    <div id="app">
+      <!-- Header -->
+      <header class="app-header">
+        <div class="app-logo">
+          <div class="logo-icon">⛑</div>
+          <div class="logo-text">
+            Safe
+            <span>Chat</span>
           </div>
         </div>
-      </div>
-
-      <!-- Document list -->
-      <div class="sidebar-section">
-        <div class="sidebar-title">📋 知識庫文件</div>
-        <ul class="doc-list">
-          <li
-            v-if="documents.length === 0"
-            class="doc-item"
-            style="color: var(--text-muted); font-style: italic;"
-          >尚未匯入文件</li>
-          <transition-group name="list">
-            <li v-for="doc in documents" :key="doc" class="doc-item">
-              <span class="doc-icon">📄</span>
-              <span class="doc-name">{{ doc }}</span>
-            </li>
-          </transition-group>
-        </ul>
-      </div>
-
-      <!-- Quick questions -->
-      <div class="sidebar-section">
-        <div class="sidebar-title">💡 快速提問</div>
-        <div class="quick-questions">
-          <button
-            v-for="q in quickQuestions"
-            :key="q"
-            class="quick-q"
-            @click="askQuick(q)"
-          >{{ q }}</button>
-        </div>
-      </div>
-
-      <!-- Reset -->
-      <div class="sidebar-actions">
-        <button class="btn-reset" @click="resetKB">🗑 清空知識庫</button>
-      </div>
-    </aside>
-
-    <!-- Chat area -->
-    <section class="chat-area">
-      <div class="chat-messages" ref="chatContainer">
-
-        <!-- Welcome -->
-        <transition name="fade">
-          <div v-if="messages.length === 0" class="welcome">
-            <div class="welcome-icon">⛑</div>
-            <h2>SafeChat</h2>
-            <p>
-              上傳營建工安法規、施工安全手冊等 PDF 文件，<br>
-              即可用自然語言查詢安全規範、危害預防措施、事故通報流程。<br><br>
-              <strong style="color: var(--accent)">← 請先從左側匯入文件，再開始提問</strong>
-            </p>
+        <div class="header-stats">
+          <div class="stat-badge" :title="healthTooltip">
+            <div class="stat-dot" :class="healthDotClass"></div>
+            <span>{{ healthLabel }}</span>
           </div>
-        </transition>
+          <div class="stat-badge">Chunks: {{ totalChunks }}</div>
+        </div>
+      </header>
 
-        <!-- Messages -->
-        <transition-group name="slide">
-          <div
-            v-for="msg in messages"
-            v-show="msg.text || msg.role === 'user'"
-            :key="msg.id"
-            class="msg"
-            :class="[msg.role, { degraded: msg.degraded }]"
-          >
-            <div class="msg-avatar">{{ msg.role === 'user' ? '👷' : '⛑' }}</div>
-            <div class="msg-body">
-              <div v-html="renderMarkdown(msg.text)"></div>
-              <div v-if="msg.sources && msg.sources.length" class="msg-sources">
-                <span
-                  v-for="(s, i) in msg.sources"
-                  :key="i"
-                  class="source-tag"
-                >📎 {{ s.source }} p.{{ s.page }}
-                  <span class="relevance">{{ Math.round(s.relevance * 100) }}%</span>
-                </span>
+      <!-- Body -->
+      <main class="app-body">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <!-- Upload -->
+          <div class="sidebar-section">
+            <div class="sidebar-title">📂 文件匯入</div>
+            <div
+              class="upload-zone"
+              :class="{ dragover: isDragging }"
+              @dragover.prevent="isDragging = true"
+              @dragleave="isDragging = false"
+              @drop.prevent="onDrop"
+            >
+              <input
+                type="file"
+                ref="fileInput"
+                accept=".pdf,.txt,.md"
+                @change="onFileSelect"
+              />
+              <div class="upload-icon">
+                <span v-if="isUploading" class="uploading-spinner"></span>
+                <span v-else>📄</span>
+              </div>
+              <div class="upload-label">
+                <template v-if="isUploading">正在匯入…</template>
+                <template v-else>
+                  拖曳或
+                  <strong>點擊上傳</strong>
+                  <br />
+                  支援 PDF / TXT / MD
+                </template>
               </div>
             </div>
+          </div>
+
+          <!-- Document list -->
+          <div class="sidebar-section">
+            <div class="sidebar-title">📋 知識庫文件</div>
+            <ul class="doc-list">
+              <li
+                v-if="documents.length === 0"
+                class="doc-item"
+                style="color: var(--text-muted); font-style: italic"
+              >
+                尚未匯入文件
+              </li>
+              <transition-group name="list">
+                <li v-for="doc in documents" :key="doc" class="doc-item">
+                  <span class="doc-icon">📄</span>
+                  <span class="doc-name">{{ doc }}</span>
+                </li>
+              </transition-group>
+            </ul>
+          </div>
+
+          <!-- Quick questions -->
+          <div class="sidebar-section">
+            <div class="sidebar-title">💡 快速提問</div>
+            <div class="quick-questions">
+              <button
+                v-for="q in quickQuestions"
+                :key="q"
+                class="quick-q"
+                @click="askQuick(q)"
+              >
+                {{ q }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Reset -->
+          <div class="sidebar-actions">
+            <button class="btn-reset" @click="resetKB">🗑 清空知識庫</button>
+          </div>
+        </aside>
+
+        <!-- Chat area -->
+        <section class="chat-area">
+          <div class="chat-messages" ref="chatContainer">
+            <!-- Welcome -->
+            <transition name="fade">
+              <div v-if="messages.length === 0" class="welcome">
+                <div class="welcome-icon">⛑</div>
+                <h2>SafeChat</h2>
+                <p>
+                  上傳營建工安法規、施工安全手冊等 PDF 文件，
+                  <br />
+                  即可用自然語言查詢安全規範、危害預防措施、事故通報流程。
+                  <br />
+                  <br />
+                  <strong style="color: var(--accent)">
+                    ← 請先從左側匯入文件，再開始提問
+                  </strong>
+                </p>
+              </div>
+            </transition>
+
+            <!-- Messages -->
+            <transition-group name="slide">
+              <div
+                v-for="msg in messages"
+                v-show="msg.text || msg.role === 'user'"
+                :key="msg.id"
+                class="msg"
+                :class="[msg.role, { degraded: msg.degraded }]"
+              >
+                <div class="msg-avatar">{{ msg.role === 'user' ? '👷' : '⛑' }}</div>
+                <div class="msg-body">
+                  <div v-html="renderMarkdown(msg.text)"></div>
+                  <div v-if="msg.sources && msg.sources.length" class="msg-sources">
+                    <span v-for="(s, i) in msg.sources" :key="i" class="source-tag">
+                      📎 {{ s.source }} p.{{ s.page }}
+                      <span class="relevance">
+                        {{ Math.round(s.relevance * 100) }}%
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </transition-group>
+
+            <!-- Typing -->
+            <transition name="fade">
+              <div v-if="isLoading" class="msg bot">
+                <div class="msg-avatar">⛑</div>
+                <div class="msg-body">
+                  <div class="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+
+          <!-- Input -->
+          <div class="chat-input-bar">
+            <div class="input-wrapper">
+              <textarea
+                ref="questionInput"
+                v-model="question"
+                placeholder="輸入工安相關問題… 例如：施工架搭設有哪些安全規範？"
+                rows="1"
+                @keydown.enter.exact.prevent="sendQuestion"
+                @input="autoResize"
+              ></textarea>
+              <button
+                class="btn-send"
+                :disabled="isLoading || !question.trim()"
+                @click="sendQuestion"
+              >
+                ➤
+              </button>
+            </div>
+            <div class="disclaimer">
+              本系統僅供參考，不構成法律意見。回答可能不完整或引用不相關條文，請以法規原文為準。
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Toasts -->
+      <div class="toast-container">
+        <transition-group name="list">
+          <div
+            v-for="t in toasts"
+            :key="t.id"
+            class="toast"
+            :class="{ error: t.isError }"
+          >
+            {{ t.message }}
           </div>
         </transition-group>
-
-        <!-- Typing -->
-        <transition name="fade">
-          <div v-if="isLoading" class="msg bot">
-            <div class="msg-avatar">⛑</div>
-            <div class="msg-body">
-              <div class="typing-indicator">
-                <span></span><span></span><span></span>
-              </div>
-            </div>
-          </div>
-        </transition>
       </div>
+    </div>
 
-      <!-- Input -->
-      <div class="chat-input-bar">
-        <div class="input-wrapper">
-          <textarea
-            ref="questionInput"
-            v-model="question"
-            placeholder="輸入工安相關問題… 例如：施工架搭設有哪些安全規範？"
-            rows="1"
-            @keydown.enter.exact.prevent="sendQuestion"
-            @input="autoResize"
-          ></textarea>
-          <button
-            class="btn-send"
-            :disabled="isLoading || !question.trim()"
-            @click="sendQuestion"
-          >➤</button>
-        </div>
-        <div class="disclaimer">本系統僅供參考，不構成法律意見。回答可能不完整或引用不相關條文，請以法規原文為準。</div>
-      </div>
-    </section>
-  </main>
-
-  <!-- Toasts -->
-  <div class="toast-container">
-    <transition-group name="list">
-      <div
-        v-for="t in toasts"
-        :key="t.id"
-        class="toast"
-        :class="{ error: t.isError }"
-      >{{ t.message }}</div>
-    </transition-group>
-  </div>
-
-</div>
-
-<!-- Vue 3 CDN -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.38/vue.global.prod.min.js"></script>
-<!-- SafeChat composable 模組（各自單一職責） -->
-<script src="/static/js/helpers.js"></script>
-<script src="/static/js/stats.js"></script>
-<script src="/static/js/upload.js"></script>
-<script src="/static/js/chat.js"></script>
-<script src="/static/js/health.js"></script>
-<!-- SafeChat 應用入口（組合各模組） -->
-<script src="/static/js/app.js"></script>
-</body>
+    <!-- Vue 3 CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.38/vue.global.prod.min.js"></script>
+    <!-- SafeChat composable 模組（各自單一職責） -->
+    <script src="/static/js/helpers.js"></script>
+    <script src="/static/js/stats.js"></script>
+    <script src="/static/js/upload.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/health.js"></script>
+    <!-- SafeChat 應用入口（組合各模組） -->
+    <script src="/static/js/app.js"></script>
+  </body>
 </html>
