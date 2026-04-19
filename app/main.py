@@ -34,6 +34,9 @@ from .config import get_settings, init_settings, setup_logging
 from .rag_engine import RAGEngine
 from .types import HealthResult, KBStats, SourceSummary
 
+# 靜態檔案版本號 — 每次容器啟動時產生，強制瀏覽器載入最新版本
+_STATIC_VERSION = uuid.uuid4().hex[:8]
+
 setup_logging()
 logger = logging.getLogger(__name__)
 
@@ -168,10 +171,14 @@ class AnswerResponse(BaseModel):
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
-    """提供主聊天介面 HTML。"""
-    return HTMLResponse(
-        content=(BASE_DIR / "templates" / "index.html").read_text(encoding="utf-8")
+    """提供主聊天介面 HTML，靜態資源路徑附加版本號以避免快取。"""
+    html = (BASE_DIR / "templates" / "index.html").read_text(encoding="utf-8")
+    html = html.replace("/static/", f"/static/").replace(
+        '.css"', f'.css?v={_STATIC_VERSION}"'
+    ).replace(
+        '.js"', f'.js?v={_STATIC_VERSION}"'
     )
+    return HTMLResponse(content=html)
 
 
 # ---------------------------------------------------------------------------
