@@ -197,7 +197,7 @@ make fetch-laws
 docker compose exec safe-chat python scripts/fetch_laws.py
 ```
 
-完成後從 UI 上傳 `data/sample_docs/*.txt`。
+完成後從 UI 批次上傳 `data/sample_docs/*.txt`（支援多檔拖放或多選）。
 
 ---
 
@@ -488,6 +488,7 @@ spec:
 - [ ] 瀏覽器能打開 UI
 - [ ] 確認輸入框下方顯示免責聲明
 - [ ] 測試上傳一份 PDF 成功
+- [ ] 測試批次上傳多份檔案，確認進度顯示與統計正確
 - [ ] 測試提問能得到帶來源標籤的回答
 - [ ] 停止 Ollama（`brew services stop ollama`），提問仍能看到檢索結果（**降級模式測試**）
 - [ ] 重啟 Ollama 後，健康狀態恢復綠燈

@@ -74,7 +74,7 @@ python scripts/fetch_laws.py  # (選用) 抓真實工安法規當測試資料
 uvicorn app.main:app --reload
 ```
 
-開瀏覽器 **http://localhost:8000** → 把 `data/sample_docs/*.txt` 拖到左側上傳區 → 開始提問。
+開瀏覽器 **http://localhost:8000** → 把 `data/sample_docs/*.txt` 拖到左側上傳區（支援多檔批次上傳）→ 開始提問。
 
 > 💡 **其他選項：** [完整部署指南](DEPLOYMENT.md)
 
