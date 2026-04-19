@@ -11,7 +11,7 @@
 #   make test       測試 RAG 端對端流程
 # ============================================================================
 
-.PHONY: help up build down logs logs-app status clean shell test fetch-laws pull-model rebuild
+.PHONY: help up build down logs logs-app status clean shell test fetch-laws pull-model rebuild lint format format-check typecheck
 
 # 預設顯示說明
 help:
@@ -138,3 +138,18 @@ test:
 test-quality:
 	@echo "🧪 執行 RAG 品質回歸測試（20 題）..."
 	@python3 tests/test_rag_quality.py
+
+# ---------------------------------------------------------------------------
+# 程式碼品質
+# ---------------------------------------------------------------------------
+lint:
+	ruff check app/ tests/ scripts/
+
+format:
+	ruff format app/ tests/ scripts/
+
+format-check:
+	ruff format --check app/ tests/ scripts/
+
+typecheck:
+	pyright app/
