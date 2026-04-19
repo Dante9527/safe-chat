@@ -102,6 +102,7 @@ createApp({
       isUploading: upload.isUploading,
       isDragging: upload.isDragging,
       fileInput: upload.fileInput,
+      uploadProgress: upload.uploadProgress,
       onDrop: upload.onDrop,
       onFileSelect: upload.onFileSelect,
       // Chat

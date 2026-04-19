@@ -54,6 +54,7 @@
                 type="file"
                 ref="fileInput"
                 accept=".pdf,.txt,.md"
+                multiple
                 @change="onFileSelect"
               />
               <div class="upload-icon">
@@ -61,12 +62,15 @@
                 <span v-else>📄</span>
               </div>
               <div class="upload-label">
-                <template v-if="isUploading">正在匯入…</template>
+                <template v-if="isUploading && uploadProgress">
+                  正在匯入… {{ uploadProgress }}
+                </template>
+                <template v-else-if="isUploading">正在匯入…</template>
                 <template v-else>
                   拖曳或
                   <strong>點擊上傳</strong>
                   <br />
-                  支援 PDF / TXT / MD
+                  支援 PDF / TXT / MD（可多選）
                 </template>
               </div>
             </div>
