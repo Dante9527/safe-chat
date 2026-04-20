@@ -45,9 +45,10 @@ def check_llm(settings: Settings) -> HealthComponent:
 
 
 def check_vector(engine: RAGEngine) -> HealthComponent:
-    """檢查向量資料庫（ChromaDB）是否正常運作。"""
+    """檢查向量資料庫（ChromaDB）是否正常運作，含 embedding 維度驗證。"""
     try:
         count = engine.collection_count()
+        engine.verify_embedding_dim()
         return HealthComponent(ok=True, chunks=count)
     except Exception as e:
         logger.error("Vector DB health check failed: %s", e)
