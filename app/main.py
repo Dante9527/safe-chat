@@ -80,6 +80,9 @@ def _init_rag_sync() -> None:
         _ = rag.llm  # 觸發 LLM 客戶端初始化
         _rag_ready = True
         logger.info("RAG 引擎就緒 — 所有元件已載入，開始接受請求。")
+    except RuntimeError:
+        logger.exception("RAG 引擎初始化失敗（不可恢復）")
+        raise SystemExit(1)
     except Exception:
         logger.exception("RAG 引擎初始化失敗")
 
