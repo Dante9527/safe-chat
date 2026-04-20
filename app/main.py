@@ -11,6 +11,7 @@ import asyncio
 import hmac
 import json
 import logging
+import os
 import re
 import uuid
 from collections.abc import AsyncGenerator, Generator
@@ -81,7 +82,19 @@ def _load_llm_background() -> None:
                 raise RuntimeError(
                     f"Ollama 模型 '{get_settings().ollama_model}' 不可用"
                 )
-            test_resp = rag.llm.invoke("ping")
+            from concurrent.futures import (
+                ThreadPoolExecutor,
+            )
+            from concurrent.futures import (
+                TimeoutError as FuturesTimeout,
+            )
+
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(rag.llm.invoke, "ping")
+                try:
+                    test_resp = future.result(timeout=30)
+                except FuturesTimeout as exc:
+                    raise RuntimeError("Ollama 推論測試超時（30 秒）") from exc
             if not test_resp:
                 raise RuntimeError("Ollama 模型無法產生回應")
             logger.info("LLM 推論測試通過")
@@ -90,6 +103,7 @@ def _load_llm_background() -> None:
     except Exception:
         logger.exception("LLM 載入失敗")
         import os
+
         os._exit(1)
 
 
@@ -97,8 +111,15 @@ def _load_llm_background() -> None:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """啟動時同步驗證 RAG 引擎，LLM 在背景載入。"""
     import threading
+
     global rag
     s = get_settings()
+    host = os.getenv("HOST", "127.0.0.1")
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise RuntimeError(
+            f"HOST={host} 非本機位址。SafeChat 設計為內網使用，"
+            f"對外部署請使用 reverse proxy + basic auth。"
+        )
     logger.info("啟動中 — 預載 RAG 引擎（SentenceTransformer + ChromaDB）…")
     rag = RAGEngine(persist_dir=str(BASE_DIR / "data" / "chroma_db"), settings=s)
     threading.Thread(target=_load_llm_background, daemon=True).start()
@@ -159,9 +180,7 @@ async def security_middleware(
         and request.method not in ("GET", "HEAD", "OPTIONS")
     ):
         origin = request.headers.get("origin", "")
-        if origin and not origin.startswith(
-            ("http://localhost:", "http://127.0.0.1:")
-        ):
+        if origin and not origin.startswith(("http://localhost:", "http://127.0.0.1:")):
             return JSONResponse(
                 status_code=403,
                 content={"detail": "跨站請求已被拒絕。"},
@@ -202,9 +221,7 @@ async def index() -> HTMLResponse:
     if not _rag_ready:
         return HTMLResponse(content=_LOADING_HTML)
     html = (BASE_DIR / "templates" / "index.html").read_text(encoding="utf-8")
-    html = html.replace(
-        '.css"', f'.css?v={_STATIC_VERSION}"'
-    ).replace(
+    html = html.replace('.css"', f'.css?v={_STATIC_VERSION}"').replace(
         '.js"', f'.js?v={_STATIC_VERSION}"'
     )
     return HTMLResponse(content=html)
@@ -261,7 +278,8 @@ async def upload_document(
     try:
         num_chunks = await asyncio.to_thread(
             get_rag().ingest_document,
-            str(dest), file.filename or "",
+            str(dest),
+            file.filename or "",
         )
     except Exception as e:
         logger.error("Ingest failed for %s: %s", dest.name, e)
