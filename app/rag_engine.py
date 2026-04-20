@@ -237,9 +237,14 @@ class RAGEngine:
         stored = meta.get("embedding_model")
         current = settings.embedding_model
         if stored is None:
-            self._collection.modify(metadata={**meta, "embedding_model": current})
-            logger.info("Stamped collection with embedding_model='%s'", current)
-            return
+            if self._collection.count() == 0:
+                self._collection.modify(metadata={**meta, "embedding_model": current})
+                logger.info("Stamped empty collection with embedding_model='%s'", current)
+                return
+            raise RuntimeError(
+                f"Collection 含有 {self._collection.count()} 個區塊但未標記 embedding 模型。"
+                f"請刪除 data/chroma_db 目錄後重新啟動並重新匯入文件。"
+            )
         if stored != current:
             raise RuntimeError(
                 f"Embedding 模型不符：collection 使用 '{stored}'，"
