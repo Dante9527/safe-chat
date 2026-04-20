@@ -172,18 +172,19 @@ RecursiveCharacterTextSplitter(
 - **Health check endpoint** — `/api/health` 檢查 LLM、向量庫、磁碟空間狀態
 - **UI 即時狀態指示** — 右上角燈號顯示綠/黃/紅三級警示
 - **Degraded message banner** — 離線模式下的回答有黃色警示邊條
-- **背景預熱 + 載入頁面** — 啟動後立即顯示載入頁面，背景載入 SentenceTransformer、ChromaDB、LLM 客戶端（約 4-5 分鐘），就緒後自動跳轉到主介面
+- **啟動驗證 + 背景載入** — 啟動時同步驗證 SentenceTransformer + ChromaDB（含 Embedding 模型一致性檢查），LLM 客戶端在背景載入；任一元件失敗則程序終止。載入期間顯示載入頁面，就緒後自動跳轉到主介面
 - **OLLAMA_KEEP_ALIVE=-1** — 模型永久留在記憶體，閒置不卸載，避免 30-60s 重載延遲
 - **OLLAMA_FLASH_ATTENTION=1** — 長 context 加速 20-40%，啟用 KV-cache 量化（2026 社群標準做法）
 - **MAX_CHAPTER_ARTICLES=8** — 章節擴展上限，避免 prompt 過大拖慢回應且稀釋相關性
 
 ```bash
-# 實測降級模式
-brew services stop ollama           # 模擬 AI 服務斷線
-# 到 UI 提問 → 會看到「系統目前以離線模式運作」+ 檢索結果
+# 實測運行中降級模式（Ollama 暫時斷線）
+brew services stop ollama           # 模擬運行中 AI 服務斷線
+# 到 UI 提問 → 會看到「系統目前以離線模式運作」+ 僅檢索結果（無 AI 摘要）
 # UI 右上角燈號變黃
 brew services start ollama          # 恢復
 # 30 秒內燈號自動轉綠
+# 注意：若啟動時 LLM 就載入失敗，程序會直接終止，不會降級
 ```
 
 ---
@@ -205,7 +206,7 @@ brew services start ollama          # 恢復
 
 ### 安全機制
 
-內建 API Key 驗證、Admin Token、速率限制、檔案上傳串流限制、Embedding 模型一致性驗證、輸入驗證、安全標頭、CORS、錯誤資訊隱藏。
+內建 API Key 驗證、Admin Token、速率限制、檔案上傳串流限制、Embedding 模型一致性驗證、CSRF Origin 檢查、輸入驗證、安全標頭、CORS、錯誤資訊隱藏。
 
 各機制的環境變數與調校方式見 **`.env.example`**，部署指引見 **[`DEPLOYMENT.md`](DEPLOYMENT.md)**。
 

@@ -491,8 +491,9 @@ spec:
 - [ ] 測試上傳一份 PDF 成功
 - [ ] 測試批次上傳多份檔案，確認進度顯示與統計正確
 - [ ] 測試提問能得到帶來源標籤的回答
-- [ ] 停止 Ollama（`brew services stop ollama`），提問仍能看到檢索結果（**降級模式測試**）
+- [ ] 運行中停止 Ollama（`brew services stop ollama`），提問仍能看到檢索結果（**運行中降級測試**）
 - [ ] 重啟 Ollama 後，健康狀態恢復綠燈
+- [ ] 停止 Ollama 後重啟 SafeChat，確認程序因 LLM 載入失敗而終止（**啟動失敗測試**）
 
 ### 安全設定
 - [ ] `.env` 中 `ADMIN_TOKEN` 已設定為強隨機字串（`openssl rand -hex 16`）

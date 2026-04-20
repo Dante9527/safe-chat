@@ -231,23 +231,33 @@ curl -X POST http://localhost:11434/api/generate \
   -d '{"model":"llama3.1:8b","prompt":"hi","stream":false,"keep_alive":-1}'
 ```
 
-### 修復 2：背景載入 + 載入頁面
+### 修復 2：同步驗證 + 背景載入
 
 ```python
-# app/main.py — 獨立 thread 載入模型，不阻塞 HTTP 服務
-def _init_rag_sync():
-    global rag, _rag_ready
-    rag = RAGEngine(...)       # SentenceTransformer + ChromaDB 在此初始化
-    _ = rag.llm                # 觸發 LLM 客戶端初始化
+# app/main.py — lifespan 同步驗證 RAG，LLM 在背景載入
+def _load_llm_background():
+    global _rag_ready
+    if rag is not None:
+        _ = rag.llm            # 觸發 LLM 客戶端初始化（慢操作）
     _rag_ready = True
+    # 失敗則 os._exit(1) — 啟動時 LLM 不可用就直接終止
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    threading.Thread(target=_init_rag_sync, daemon=True).start()
+    global rag
+    rag = RAGEngine(...)       # SentenceTransformer + ChromaDB + Embedding 驗證（同步）
+    threading.Thread(target=_load_llm_background, daemon=True).start()
     yield
+    # RuntimeError（如 Embedding 模型不符）會從 lifespan 冒出，FastAPI 不啟動
 ```
 
-模型載入（e5-large-instruct ~2.2GB）在 Docker CPU 環境需約 4-5 分鐘。原本的阻塞式 lifespan 會導致用戶看到「無法連上網站」。改為背景載入後，服務立即接受連線：
+設計考量：
+- **Embedding 模型驗證**在 lifespan 同步執行，不符則 RuntimeError → 程序不啟動
+- **LLM 載入**是慢操作（e5-large-instruct ~2.2GB，Docker CPU 需約 4-5 分鐘），放背景 thread
+- **LLM 載入失敗**則 `os._exit(1)` 終止程序，不降級
+- **運行中 Ollama 暫時斷線**仍會降級（只回檢索結果，不合成回答）— 這是合理的，因為 Ollama 可能只是暫時重啟
+
+載入期間行為不變：
 - 載入期間：`/` 回傳載入頁面（`templates/loading.html`），每 5 秒輪詢 `/api/health`
 - `/api/health` 回傳 503 + `{"status": "starting"}`
 - 就緒後：頁面自動跳轉到主介面，首次請求無冷啟動
