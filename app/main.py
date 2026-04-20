@@ -213,17 +213,27 @@ def _validate_upload(filename: str | None) -> str:
     return suffix
 
 
+_UPLOAD_CHUNK = 64 * 1024  # 64 KB
+
+
 async def _save_upload(file: UploadFile) -> Path:
-    """將上傳檔案寫入磁碟，回傳儲存路徑。"""
+    """串流寫入上傳檔案，超過大小上限立即中斷。"""
     s = get_settings()
     file_id = uuid.uuid4().hex[:8]
     safe_name = re.sub(r"[^\w\-.]", "_", Path(file.filename or "upload").name)
     dest = UPLOAD_DIR / f"{file_id}_{safe_name}"
-    content = await file.read()
-    if len(content) > s.max_upload_bytes:
-        raise HTTPException(413, f"檔案過大，上限為 {s.max_upload_mb} MB。")
-    dest.write_bytes(content)
-    logger.info("Saved upload → %s (%d bytes)", dest.name, len(content))
+    total = 0
+    try:
+        with dest.open("wb") as f:
+            while chunk := await file.read(_UPLOAD_CHUNK):
+                total += len(chunk)
+                if total > s.max_upload_bytes:
+                    raise HTTPException(413, f"檔案過大，上限為 {s.max_upload_mb} MB。")
+                f.write(chunk)
+    except HTTPException:
+        dest.unlink(missing_ok=True)
+        raise
+    logger.info("Saved upload → %s (%d bytes)", dest.name, total)
     return dest
 
 
