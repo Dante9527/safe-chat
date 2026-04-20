@@ -37,6 +37,7 @@ class ChunkMeta(TypedDict):
     chunk_index: int
     article: str
     chapter: str
+    version: str
 
 
 class SourceSummary(TypedDict):
