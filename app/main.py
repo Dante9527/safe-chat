@@ -81,6 +81,10 @@ def _load_llm_background() -> None:
                 raise RuntimeError(
                     f"Ollama 模型 '{get_settings().ollama_model}' 不可用"
                 )
+            test_resp = rag.llm.invoke("ping")
+            if not test_resp:
+                raise RuntimeError("Ollama 模型無法產生回應")
+            logger.info("LLM 推論測試通過")
         _rag_ready = True
         logger.info("RAG 引擎就緒 — 所有元件已載入，開始接受請求。")
     except Exception:
