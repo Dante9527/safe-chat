@@ -384,6 +384,9 @@ docker compose logs safe-chat | grep -E "ERROR|WARN"
 | UI 讀不到 Chunks | ChromaDB 損毀 | 從備份還原 `data/chroma_db/` |
 | 啟動即 crash | Embedding 模型變更 | 刪除 `data/chroma_db/` 後重新啟動並重新匯入文件 |
 | 啟動即 crash | Ollama 未啟動或模型不存在 | 確認 Ollama 已啟動且已拉取指定模型（`ollama pull llama3.1:8b`） |
+| 啟動即 crash | HOST 非本機位址 | SafeChat 設計為內網使用，HOST 須為 `127.0.0.1` 或 `localhost` |
+| 啟動即 crash | LLM 推論測試超時 | 確認 Ollama 有足夠記憶體載入模型，或換用較小模型 |
+| 啟動 log 顯示 Reconciled | crash 殘留孤兒版本 | 正常行為，系統自動清理，無需處理 |
 | 上傳成功但 0 chunks | 檔案無可解析文字（掃描 PDF 等） | 使用含文字的 PDF/TXT/MD 檔案 |
 
 ---

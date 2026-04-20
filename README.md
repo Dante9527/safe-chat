@@ -172,8 +172,9 @@ RecursiveCharacterTextSplitter(
 - **Health check endpoint** — `/api/health` 檢查 LLM、向量庫、磁碟空間狀態
 - **UI 即時狀態指示** — 右上角燈號顯示綠/黃/紅三級警示
 - **Degraded message banner** — 離線模式下的回答有黃色警示邊條
-- **啟動驗證 + 背景載入** — 啟動時同步驗證 SentenceTransformer + ChromaDB（含 Embedding 模型一致性檢查），LLM 在背景載入並驗證 Ollama 模型可達性；任一元件失敗則程序終止。載入期間顯示載入頁面，就緒後自動跳轉到主介面
-- **原子替換** — 重新上傳同名文件時，先寫入新版本再刪除舊版本；寫入失敗不影響既有資料，刪舊失敗則回滾新版本
+- **啟動驗證 + 背景載入** — 啟動時同步驗證 SentenceTransformer + ChromaDB（含 Embedding 模型一致性檢查），LLM 在背景載入並實際測試推論能力（30 秒 timeout）；任一元件失敗則程序終止。HOST 非 `127.0.0.1` / `localhost` 時拒絕啟動
+- **原子替換** — 重新上傳同名文件時，先寫入新版本再刪除舊版本；寫入失敗不影響既有資料，刪舊失敗則回滾新版本。全域 lock 防止 reset 與上傳競爭
+- **孤兒版本清理** — 啟動時自動偵測並清除 crash 殘留的多版本向量
 - **OLLAMA_KEEP_ALIVE=-1** — 模型永久留在記憶體，閒置不卸載，避免 30-60s 重載延遲
 - **OLLAMA_FLASH_ATTENTION=1** — 長 context 加速 20-40%，啟用 KV-cache 量化（2026 社群標準做法）
 - **MAX_CHAPTER_ARTICLES=8** — 章節擴展上限，避免 prompt 過大拖慢回應且稀釋相關性

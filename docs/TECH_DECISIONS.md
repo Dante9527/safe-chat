@@ -234,7 +234,7 @@ curl -X POST http://localhost:11434/api/generate \
 ### 修復 2：同步驗證 + 背景載入
 
 ```python
-# app/main.py — lifespan 同步驗證 RAG，LLM 在背景載入並驗證可達性
+# app/main.py — lifespan 同步驗證 RAG，LLM 在背景載入並測試推論
 def _load_llm_background():
     global _rag_ready
     if rag is not None:
@@ -242,23 +242,32 @@ def _load_llm_background():
         result = check_llm(get_settings())  # 呼叫 /api/tags 確認模型存在
         if not result.get("ok"):
             raise RuntimeError("Ollama 模型不可用")
+        # 實際測試推論（30 秒 timeout）
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(rag.llm.invoke, "ping")
+            test_resp = future.result(timeout=30)
     _rag_ready = True
     # 失敗則 os._exit(1) — 啟動時 LLM 不可用就直接終止
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global rag
-    rag = RAGEngine(...)       # SentenceTransformer + ChromaDB + Embedding 驗證（同步）
+    host = os.getenv("HOST", "127.0.0.1")
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise RuntimeError("HOST 非本機位址，拒絕啟動")
+    rag = RAGEngine(...)       # SentenceTransformer + ChromaDB + Embedding 驗證 + 孤兒清理（同步）
     threading.Thread(target=_load_llm_background, daemon=True).start()
     yield
-    # RuntimeError（如 Embedding 模型不符）會從 lifespan 冒出，FastAPI 不啟動
 ```
 
 設計考量：
+- **HOST 限制**在 lifespan 最先檢查，非本機位址直接拒絕啟動（SafeChat 設計為內網使用）
 - **Embedding 模型驗證**在 lifespan 同步執行，不符則 RuntimeError → 程序不啟動
+- **孤兒版本清理**在 RAGEngine 初始化時自動偵測並清除 crash 殘留的多版本向量
 - **LLM 載入**是慢操作（e5-large-instruct ~2.2GB，Docker CPU 需約 4-5 分鐘），放背景 thread
-- **LLM 可達性驗證**建構後呼叫 Ollama `/api/tags` 確認模型存在，不做推理
+- **LLM 可達性驗證**先呼叫 `/api/tags` 確認模型存在，再做一次實際推論測試（30 秒 timeout）
 - **LLM 載入或驗證失敗**則 `os._exit(1)` 終止程序，不降級
+- **全域 RLock**序列化 ingest 與 reset 操作，防止競爭條件
 - **運行中 Ollama 暫時斷線**仍會降級（只回檢索結果，不合成回答）— 這是合理的，因為 Ollama 可能只是暫時重啟
 
 載入期間行為不變：
