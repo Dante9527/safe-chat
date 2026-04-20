@@ -215,14 +215,11 @@ SafeChat 內建多層安全防護，部署前務必修改 `.env` 中的安全相
 # 在 .env 中設定管理員 token（必要）
 ADMIN_TOKEN=$(openssl rand -hex 16)
 
-# 若非封閉內網，建議也設定 API Key
-API_KEY=$(openssl rand -hex 16)
 ```
 
 | 安全機制 | 說明 |
 |---------|------|
 | **Admin Token** | `/api/reset`（清空知識庫）需帶 `X-Admin-Token` 標頭 |
-| **API Key 驗證** | 所有 `/api/*` 端點（`/api/health` 除外）需帶 `Authorization: Bearer <key>` |
 | **速率限制** | 每個 IP 的請求頻率上限 |
 | **檔案上傳限制** | 大小上限、副檔名白名單（.pdf, .txt, .md）、檔名消毒 |
 | **輸入驗證** | 提問長度限制、top_k 範圍限制 |
@@ -245,7 +242,6 @@ services:
 ```
 
 即使是內網部署，仍建議設定 `ADMIN_TOKEN`（防止誤操作清空知識庫）。
-`API_KEY` 在封閉內網可留空；若同一網段有不受信任的設備則建議設定。
 
 ### 若必須對外，加上反向代理 + HTTPS
 
@@ -288,11 +284,11 @@ server {
 }
 ```
 
-對外部署時**務必**設定 `API_KEY`，配合 nginx HTTPS 使用。
+對外部署時**務必**配合 nginx HTTPS 使用。
 
 ### 基本認證（額外防護）
 
-除了應用內建的 API Key 外，也可在 nginx 加 basic auth 做雙層認證：
+可在 nginx 加 basic auth 做額外認證：
 
 ```bash
 sudo apt install apache2-utils
@@ -387,6 +383,8 @@ docker compose logs safe-chat | grep -E "ERROR|WARN"
 | 磁碟滿 | 上傳太多 PDF | 清 `data/uploads/` 舊檔 |
 | UI 讀不到 Chunks | ChromaDB 損毀 | 從備份還原 `data/chroma_db/` |
 | 啟動即 crash | Embedding 模型變更 | 刪除 `data/chroma_db/` 後重新啟動並重新匯入文件 |
+| 啟動即 crash | Ollama 未啟動或模型不存在 | 確認 Ollama 已啟動且已拉取指定模型（`ollama pull llama3.1:8b`） |
+| 上傳成功但 0 chunks | 檔案無可解析文字（掃描 PDF 等） | 使用含文字的 PDF/TXT/MD 檔案 |
 
 ---
 
@@ -497,11 +495,9 @@ spec:
 
 ### 安全設定
 - [ ] `.env` 中 `ADMIN_TOKEN` 已設定為強隨機字串（`openssl rand -hex 16`）
-- [ ] 若對外部署：`API_KEY` 已設定
 - [ ] 測試：無 Admin Token 的 `DELETE /api/reset` 回傳 403
 - [ ] 測試：上傳超過 `MAX_UPLOAD_MB` 的檔案回傳 413
 - [ ] 測試：重新上傳同名但損壞的檔案，既有知識庫資料不受影響
-- [ ] 若設定 `API_KEY`：無 Bearer token 的 API 請求回傳 401
 
 ### 維運
 - [ ] 設定定期備份 cron

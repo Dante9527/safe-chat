@@ -172,7 +172,8 @@ RecursiveCharacterTextSplitter(
 - **Health check endpoint** — `/api/health` 檢查 LLM、向量庫、磁碟空間狀態
 - **UI 即時狀態指示** — 右上角燈號顯示綠/黃/紅三級警示
 - **Degraded message banner** — 離線模式下的回答有黃色警示邊條
-- **啟動驗證 + 背景載入** — 啟動時同步驗證 SentenceTransformer + ChromaDB（含 Embedding 模型一致性檢查），LLM 客戶端在背景載入；任一元件失敗則程序終止。載入期間顯示載入頁面，就緒後自動跳轉到主介面
+- **啟動驗證 + 背景載入** — 啟動時同步驗證 SentenceTransformer + ChromaDB（含 Embedding 模型一致性檢查），LLM 在背景載入並驗證 Ollama 模型可達性；任一元件失敗則程序終止。載入期間顯示載入頁面，就緒後自動跳轉到主介面
+- **原子替換** — 重新上傳同名文件時，先寫入新版本再刪除舊版本；寫入失敗不影響既有資料，刪舊失敗則回滾新版本
 - **OLLAMA_KEEP_ALIVE=-1** — 模型永久留在記憶體，閒置不卸載，避免 30-60s 重載延遲
 - **OLLAMA_FLASH_ATTENTION=1** — 長 context 加速 20-40%，啟用 KV-cache 量化（2026 社群標準做法）
 - **MAX_CHAPTER_ARTICLES=8** — 章節擴展上限，避免 prompt 過大拖慢回應且稀釋相關性
@@ -195,18 +196,17 @@ brew services start ollama          # 恢復
 |--------|------|------|------|
 | `GET` | `/` | SafeChat Web UI | — |
 | `GET` | `/api/health` | 健康檢查（LLM / 向量庫 / 磁碟狀態） | — |
-| `POST` | `/api/upload` | 上傳文件（multipart/form-data） | API Key* |
-| `POST` | `/api/ask` | 提問（JSON: `{question, top_k}`），等待完整回答 | API Key* |
-| `POST` | `/api/ask/stream` | 提問（SSE 串流），逐 token 即時推送 | API Key* |
-| `GET` | `/api/stats` | 知識庫統計 | API Key* |
+| `POST` | `/api/upload` | 上傳文件（multipart/form-data） | — |
+| `POST` | `/api/ask` | 提問（JSON: `{question, top_k}`），等待完整回答 | — |
+| `POST` | `/api/ask/stream` | 提問（SSE 串流），逐 token 即時推送 | — |
+| `GET` | `/api/stats` | 知識庫統計 | — |
 | `DELETE` | `/api/reset` | 清空知識庫 | Admin Token |
 
-> \* API Key 為可選認證——設定 `API_KEY` 後才啟用。`/api/health` 免認證（供 Docker healthcheck 使用）。
 > `/api/reset` 需要 `ADMIN_TOKEN`（透過 `X-Admin-Token` 標頭傳送），未設定時此功能停用。
 
 ### 安全機制
 
-內建 API Key 驗證、Admin Token、速率限制、檔案上傳串流限制、Embedding 模型一致性驗證、CSRF Origin 檢查、輸入驗證、安全標頭、CORS、錯誤資訊隱藏。
+內建 Admin Token、速率限制、檔案上傳串流限制、Embedding 模型一致性驗證、輸入驗證、安全標頭、CORS、錯誤資訊隱藏。
 
 各機制的環境變數與調校方式見 **`.env.example`**，部署指引見 **[`DEPLOYMENT.md`](DEPLOYMENT.md)**。
 
@@ -325,7 +325,7 @@ safe-chat/
 | **IoT 整合** | GPS 車輛座標 + 地理圍欄 → 車輛進入危險區自動推送安全規範 |
 | **多模態** | 上傳工地照片，AI 判斷安全合規狀態 |
 | ✅ **Streaming** | SSE 串流回答（`/api/ask/stream`），逐 token 即時顯示，已實現 |
-| ✅ **基礎安全** | API Key 驗證、Admin Token、速率限制、檔案上傳限制、輸入驗證、安全標頭，已實現 |
+| ✅ **基礎安全** | Admin Token、速率限制、檔案上傳限制、輸入驗證、安全標頭，已實現 |
 | **權限管理** | 依角色（工地主任/安全官/作業員）分層查詢 |
 | **語音介面** | Whisper 整合，現場人員語音提問 |
 | **RAG 評估** | RAGAS / DeepEval 評估 faithfulness & relevancy |

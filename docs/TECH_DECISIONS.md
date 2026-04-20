@@ -234,11 +234,14 @@ curl -X POST http://localhost:11434/api/generate \
 ### 修復 2：同步驗證 + 背景載入
 
 ```python
-# app/main.py — lifespan 同步驗證 RAG，LLM 在背景載入
+# app/main.py — lifespan 同步驗證 RAG，LLM 在背景載入並驗證可達性
 def _load_llm_background():
     global _rag_ready
     if rag is not None:
-        _ = rag.llm            # 觸發 LLM 客戶端初始化（慢操作）
+        _ = rag.llm            # 建構 ChatOllama（lazy，不驗證連線）
+        result = check_llm(get_settings())  # 呼叫 /api/tags 確認模型存在
+        if not result.get("ok"):
+            raise RuntimeError("Ollama 模型不可用")
     _rag_ready = True
     # 失敗則 os._exit(1) — 啟動時 LLM 不可用就直接終止
 
@@ -254,7 +257,8 @@ async def lifespan(app: FastAPI):
 設計考量：
 - **Embedding 模型驗證**在 lifespan 同步執行，不符則 RuntimeError → 程序不啟動
 - **LLM 載入**是慢操作（e5-large-instruct ~2.2GB，Docker CPU 需約 4-5 分鐘），放背景 thread
-- **LLM 載入失敗**則 `os._exit(1)` 終止程序，不降級
+- **LLM 可達性驗證**建構後呼叫 Ollama `/api/tags` 確認模型存在，不做推理
+- **LLM 載入或驗證失敗**則 `os._exit(1)` 終止程序，不降級
 - **運行中 Ollama 暫時斷線**仍會降級（只回檢索結果，不合成回答）— 這是合理的，因為 Ollama 可能只是暫時重啟
 
 載入期間行為不變：

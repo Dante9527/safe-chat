@@ -182,32 +182,6 @@ open http://localhost:8000
 
 ---
 
-## API 回傳 401 Unauthorized
-
-### 症狀：所有 API 請求都回 `{"detail": "未授權：請提供有效的 API Key。"}`
-
-**原因：** `.env` 中設定了 `API_KEY`，但請求未帶正確的 Authorization 標頭。
-
-**解法：**
-
-```bash
-# 確認 API_KEY 設定
-grep API_KEY .env
-
-# 測試帶 API Key 的請求
-curl -H "Authorization: Bearer <你的API_KEY>" http://localhost:8000/api/stats
-```
-
-**前端使用者：** 在瀏覽器 Console 設定 API Key：
-```javascript
-sessionStorage.setItem('safechat_api_key', '你的API_KEY')
-```
-然後重新整理頁面。
-
-**若不需要 API Key 驗證：** 將 `.env` 中的 `API_KEY=` 留空，重啟服務即可。
-
----
-
 ## API 回傳 403 Forbidden（清空知識庫）
 
 ### 症狀：點「清空知識庫」後顯示「管理員 token 無效」或「此功能已停用」
