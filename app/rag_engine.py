@@ -274,11 +274,11 @@ class RAGEngine:
             self._collection.delete(ids=stale_ids)
             logger.info("Deleted %d stale chunks for '%s'", len(stale_ids), source_label)
 
-    def _ingest_law(self, raw_text: str, source_label: str, version: str) -> int:
-        """法規文件匯入 — 依條文邊界切分。"""
+    def _ingest_law(self, raw_text: str, source_label: str, version: str) -> tuple[int, list[str]]:
+        """法規文件匯入 — 依條文邊界切分。回傳 (chunk 數, ID 清單)。"""
         article_chunks = self._split_by_article(raw_text)
         if not article_chunks:
-            return 0
+            return 0, []
 
         ids = [
             f"{source_label}::v{version}::{c['article']}::chunk_{i}"
@@ -297,13 +297,13 @@ class RAGEngine:
             for i, c in enumerate(article_chunks)
         ]
         self._collection.upsert(ids=ids, documents=texts, metadatas=metadatas)  # type: ignore[arg-type]
-        return len(article_chunks)
+        return len(article_chunks), ids
 
-    def _ingest_general(self, raw_docs: list[object], source_label: str, version: str) -> int:
-        """一般文件匯入 — 用 RecursiveCharacterTextSplitter 切分。"""
+    def _ingest_general(self, raw_docs: list[object], source_label: str, version: str) -> tuple[int, list[str]]:
+        """一般文件匯入 — 用 RecursiveCharacterTextSplitter 切分。回傳 (chunk 數, ID 清單)。"""
         chunks = self._splitter.split_documents(raw_docs)  # type: ignore[arg-type]
         if not chunks:
-            return 0
+            return 0, []
 
         ids = [f"{source_label}::v{version}::chunk_{i}" for i in range(len(chunks))]
         texts = [c.page_content for c in chunks]  # type: ignore[union-attr]
@@ -319,7 +319,7 @@ class RAGEngine:
             for i, c in enumerate(chunks)
         ]
         self._collection.upsert(ids=ids, documents=texts, metadatas=metadatas)  # type: ignore[arg-type]
-        return len(chunks)
+        return len(chunks), ids
 
     def ingest_document(self, filepath: str, original_name: str = "") -> int:
         """匯入文件：載入 → 切分 → 寫入新版 → 刪除舊版，回傳區塊數。"""
@@ -337,15 +337,21 @@ class RAGEngine:
         version = uuid.uuid4().hex[:8]
 
         if self._ARTICLE_RE.search(full_text):
-            count = self._ingest_law(full_text, source_label, version)
+            count, new_ids = self._ingest_law(full_text, source_label, version)
         else:
-            count = self._ingest_general(raw_docs, source_label, version)
+            count, new_ids = self._ingest_general(raw_docs, source_label, version)
 
         if count == 0:
             logger.warning("No chunks produced from %s", source_label)
             return 0
 
-        self._delete_stale_versions(source_label, version)
+        try:
+            self._delete_stale_versions(source_label, version)
+        except Exception:
+            logger.exception("刪除舊版本失敗，回滾新版本")
+            self._collection.delete(ids=new_ids)
+            raise
+
         logger.info("Ingested %s → %d chunks (v=%s)", source_label, count, version)
         return count
 
