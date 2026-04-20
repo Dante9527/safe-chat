@@ -147,7 +147,22 @@ if settings.cors_origins:
 async def security_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """安全回應標頭。"""
+    """CSRF Origin 檢查與安全回應標頭。"""
+    path = request.url.path
+    if (
+        path.startswith("/api/")
+        and path != "/api/health"
+        and request.method not in ("GET", "HEAD", "OPTIONS")
+    ):
+        origin = request.headers.get("origin", "")
+        if origin and not origin.startswith(
+            ("http://localhost:", "http://127.0.0.1:")
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "跨站請求已被拒絕。"},
+            )
+
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -240,8 +255,9 @@ async def upload_document(
     dest = await _save_upload(file)
 
     try:
-        num_chunks = get_rag().ingest_document(
-            str(dest), original_name=file.filename or ""
+        num_chunks = await asyncio.to_thread(
+            get_rag().ingest_document,
+            str(dest), file.filename or "",
         )
     except Exception as e:
         logger.error("Ingest failed for %s: %s", dest.name, e)
