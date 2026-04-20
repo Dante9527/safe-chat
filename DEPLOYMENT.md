@@ -386,6 +386,7 @@ docker compose logs safe-chat | grep -E "ERROR|WARN"
 | `/api/health` 回 `llm.ok: false` | Ollama 沒啟動 | `brew services restart ollama`（macOS）或 `systemctl restart ollama`（Linux） |
 | 磁碟滿 | 上傳太多 PDF | 清 `data/uploads/` 舊檔 |
 | UI 讀不到 Chunks | ChromaDB 損毀 | 從備份還原 `data/chroma_db/` |
+| 啟動即 crash | Embedding 模型變更 | 刪除 `data/chroma_db/` 後重新啟動並重新匯入文件 |
 
 ---
 
@@ -498,6 +499,7 @@ spec:
 - [ ] 若對外部署：`API_KEY` 已設定
 - [ ] 測試：無 Admin Token 的 `DELETE /api/reset` 回傳 403
 - [ ] 測試：上傳超過 `MAX_UPLOAD_MB` 的檔案回傳 413
+- [ ] 測試：重新上傳同名但損壞的檔案，既有知識庫資料不受影響
 - [ ] 若設定 `API_KEY`：無 Bearer token 的 API 請求回傳 401
 
 ### 維運

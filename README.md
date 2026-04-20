@@ -205,7 +205,7 @@ brew services start ollama          # 恢復
 
 ### 安全機制
 
-內建 API Key 驗證、Admin Token、速率限制、檔案上傳限制、輸入驗證、安全標頭、CORS、錯誤資訊隱藏。
+內建 API Key 驗證、Admin Token、速率限制、檔案上傳串流限制、Embedding 模型一致性驗證、輸入驗證、安全標頭、CORS、錯誤資訊隱藏。
 
 各機制的環境變數與調校方式見 **`.env.example`**，部署指引見 **[`DEPLOYMENT.md`](DEPLOYMENT.md)**。
 
