@@ -64,10 +64,7 @@ class SentenceTransformerEmbedding(chromadb.EmbeddingFunction):
     def query(self, input: list[str]) -> list[list[float]]:
         """查詢用嵌入 — E5-instruct 使用任務描述前綴，E5-base 使用 'query: ' 前綴。"""
         if self._is_e5_instruct:
-            texts = [
-                f"Instruct: {self._E5_INSTRUCT_TASK}\nQuery: {t}"
-                for t in input
-            ]
+            texts = [f"Instruct: {self._E5_INSTRUCT_TASK}\nQuery: {t}" for t in input]
         elif self._is_e5:
             texts = [f"query: {t}" for t in input]
         else:
@@ -125,12 +122,14 @@ class RAGEngine:
         self._validate_embedding_model(settings)
         self._source_locks: dict[str, threading.Lock] = {}
         self._locks_guard = threading.Lock()
+        self._global_lock = threading.RLock()
         self._llm: LLMProtocol | None = None
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
             separators=["\n\n", "\n", "。", "；", "，", " ", ""],
         )
+        self._reconcile_versions()
         logger.info(
             "RAGEngine ready — collection '%s' has %d chunks",
             settings.collection_name,
@@ -242,10 +241,13 @@ class RAGEngine:
         if stored is None:
             if self._collection.count() == 0:
                 self._collection.modify(metadata={**meta, "embedding_model": current})
-                logger.info("Stamped empty collection with embedding_model='%s'", current)
+                logger.info(
+                    "Stamped empty collection with embedding_model='%s'", current
+                )
                 return
+            count = self._collection.count()
             raise RuntimeError(
-                f"Collection 含有 {self._collection.count()} 個區塊但未標記 embedding 模型。"
+                f"Collection 含有 {count} 個區塊但未標記 embedding 模型。"
                 f"請刪除 data/chroma_db 目錄後重新啟動並重新匯入文件。"
             )
         if stored != current:
@@ -254,6 +256,30 @@ class RAGEngine:
                 f"設定為 '{current}'。"
                 f"請刪除 data/chroma_db 目錄後重新啟動並重新匯入文件。"
             )
+
+    def _reconcile_versions(self) -> None:
+        """啟動時清理孤兒版本，每個 source 只保留最新版。"""
+        if self._collection.count() == 0:
+            return
+        all_data = self._collection.get(include=["metadatas"])
+        sources: dict[str, list[tuple[str, str]]] = {}
+        for eid, meta in zip(all_data["ids"], all_data["metadatas"], strict=True):
+            src = meta.get("source", "")
+            ver = meta.get("version", "")
+            sources.setdefault(src, []).append((eid, ver))
+        for src, entries in sources.items():
+            versions = {ver for _, ver in entries}
+            if len(versions) <= 1:
+                continue
+            latest = max(versions)
+            stale = [eid for eid, ver in entries if ver != latest]
+            if stale:
+                self._collection.delete(ids=stale)
+                logger.warning(
+                    "Reconciled %d orphan chunks for '%s'",
+                    len(stale),
+                    src,
+                )
 
     def verify_embedding_dim(self) -> None:
         """驗證 embedding 維度與 collection 相容。"""
@@ -268,21 +294,29 @@ class RAGEngine:
             )
 
     def _delete_stale_versions(
-        self, source_label: str, current_version: str,
+        self,
+        source_label: str,
+        current_version: str,
     ) -> None:
         """刪除指定來源中不屬於當前版本的舊區塊。"""
         existing = self._collection.get(
-            where={"source": source_label}, include=["metadatas"],
+            where={"source": source_label},
+            include=["metadatas"],
         )
         stale_ids = [
-            eid for eid, meta in zip(existing["ids"], existing["metadatas"])
+            eid
+            for eid, meta in zip(existing["ids"], existing["metadatas"], strict=True)
             if meta.get("version") != current_version
         ]
         if stale_ids:
             self._collection.delete(ids=stale_ids)
-            logger.info("Deleted %d stale chunks for '%s'", len(stale_ids), source_label)
+            logger.info(
+                "Deleted %d stale chunks for '%s'", len(stale_ids), source_label
+            )
 
-    def _ingest_law(self, raw_text: str, source_label: str, version: str) -> tuple[int, list[str]]:
+    def _ingest_law(
+        self, raw_text: str, source_label: str, version: str
+    ) -> tuple[int, list[str]]:
         """法規文件匯入 — 依條文邊界切分。回傳 (chunk 數, ID 清單)。"""
         article_chunks = self._split_by_article(raw_text)
         if not article_chunks:
@@ -307,8 +341,10 @@ class RAGEngine:
         self._collection.upsert(ids=ids, documents=texts, metadatas=metadatas)  # type: ignore[arg-type]
         return len(article_chunks), ids
 
-    def _ingest_general(self, raw_docs: list[object], source_label: str, version: str) -> tuple[int, list[str]]:
-        """一般文件匯入 — 用 RecursiveCharacterTextSplitter 切分。回傳 (chunk 數, ID 清單)。"""
+    def _ingest_general(
+        self, raw_docs: list[object], source_label: str, version: str
+    ) -> tuple[int, list[str]]:
+        """一般文件匯入 — 固定字元數切分。回傳 (chunk 數, ID 清單)。"""
         chunks = self._splitter.split_documents(raw_docs)  # type: ignore[arg-type]
         if not chunks:
             return 0, []
@@ -337,9 +373,9 @@ class RAGEngine:
             return self._source_locks[source_label]
 
     def ingest_document(self, filepath: str, original_name: str = "") -> int:
-        """匯入文件（per-source 序列化）。"""
+        """匯入文件（全域 + per-source 序列化）。"""
         source_label = original_name or Path(filepath).name
-        with self._get_source_lock(source_label):
+        with self._global_lock, self._get_source_lock(source_label):
             return self._ingest_locked(filepath, source_label)
 
     def _ingest_locked(self, filepath: str, source_label: str) -> int:
@@ -683,16 +719,16 @@ class RAGEngine:
 
     def reset(self) -> None:
         """刪除並重建向量集合（清空知識庫）。"""
-        with self._locks_guard:
+        with self._global_lock:
             self._source_locks.clear()
-        name = self._settings.collection_name
-        self._client.delete_collection(name)  # type: ignore[no-untyped-call]
-        self._collection = self._client.get_or_create_collection(  # type: ignore[no-untyped-call]
-            name=name,
-            embedding_function=self._embed_fn,
-            metadata={
-                "hnsw:space": "cosine",
-                "embedding_model": self._settings.embedding_model,
-            },
-        )
-        logger.info("Collection '%s' reset.", name)
+            name = self._settings.collection_name
+            self._client.delete_collection(name)  # type: ignore[no-untyped-call]
+            self._collection = self._client.get_or_create_collection(  # type: ignore[no-untyped-call]
+                name=name,
+                embedding_function=self._embed_fn,
+                metadata={
+                    "hnsw:space": "cosine",
+                    "embedding_model": self._settings.embedding_model,
+                },
+            )
+            logger.info("Collection '%s' reset.", name)
