@@ -33,7 +33,6 @@ class Settings:
 
     # Security
     admin_token: str
-    api_key: str
     max_upload_mb: int
     cors_origins: tuple[str, ...]
     rate_limit: str
@@ -66,7 +65,6 @@ class Settings:
             chunk_size=600,
             chunk_overlap=120,
             admin_token=os.getenv("ADMIN_TOKEN", ""),
-            api_key=os.getenv("API_KEY", ""),
             max_upload_mb=_env_int("MAX_UPLOAD_MB", "20"),
             cors_origins=tuple(
                 o for o in os.getenv("CORS_ORIGINS", "").split(",") if o
