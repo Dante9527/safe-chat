@@ -242,7 +242,8 @@ class RAGEngine:
         if stored != current:
             raise RuntimeError(
                 f"Embedding 模型不符：collection 使用 '{stored}'，"
-                f"設定為 '{current}'。請執行 /api/reset 清除後重新匯入。"
+                f"設定為 '{current}'。"
+                f"請刪除 data/chroma_db 目錄後重新啟動並重新匯入文件。"
             )
 
     def verify_embedding_dim(self) -> None:
@@ -312,9 +313,8 @@ class RAGEngine:
         return len(chunks)
 
     def ingest_document(self, filepath: str, original_name: str = "") -> int:
-        """匯入文件：載入 → 切分 → 嵌入 → 存入向量資料庫，回傳區塊數。"""
+        """匯入文件：載入 → 切分 → 驗證 → 刪舊 → 寫入，回傳區塊數。"""
         source_label = original_name or Path(filepath).name
-        self._delete_source(source_label)
         raw_docs = self._load_raw(filepath)
         if not raw_docs:
             logger.warning("No content loaded from %s", filepath)
@@ -325,14 +325,21 @@ class RAGEngine:
             for d in raw_docs
         )
 
-        # 法規文件：依條文邊界切分；一般文件：固定字元數切分
+        # 先驗證能產出有效區塊，才刪舊寫新，避免損壞檔案清空既有資料
         if self._ARTICLE_RE.search(full_text):
+            if not self._split_by_article(full_text):
+                logger.warning("No chunks produced from %s", source_label)
+                return 0
+            self._delete_source(source_label)
             count = self._ingest_law(full_text, source_label)
-            logger.info("Ingested (law) %s → %d chunks", source_label, count)
         else:
+            if not self._splitter.split_documents(raw_docs):
+                logger.warning("No chunks produced from %s", source_label)
+                return 0
+            self._delete_source(source_label)
             count = self._ingest_general(raw_docs, source_label)
-            logger.info("Ingested (general) %s → %d chunks", source_label, count)
 
+        logger.info("Ingested %s → %d chunks", source_label, count)
         return count
 
     # -- 向量檢索 -----------------------------------------------------------
