@@ -120,6 +120,7 @@ class RAGEngine:
             embedding_function=self._embed_fn,
             metadata={"hnsw:space": "cosine"},
         )
+        self._validate_embedding_model(settings)
         self._llm: LLMProtocol | None = None
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
@@ -229,6 +230,42 @@ class RAGEngine:
 
         return chunks
 
+    def _validate_embedding_model(self, settings: Settings) -> None:
+        """啟動時驗證 collection 的 embedding 模型是否一致。"""
+        meta = self._collection.metadata or {}
+        stored = meta.get("embedding_model")
+        current = settings.embedding_model
+        if stored is None:
+            self._collection.modify(metadata={**meta, "embedding_model": current})
+            logger.info("Stamped collection with embedding_model='%s'", current)
+            return
+        if stored != current:
+            raise RuntimeError(
+                f"Embedding 模型不符：collection 使用 '{stored}'，"
+                f"設定為 '{current}'。請執行 /api/reset 清除後重新匯入。"
+            )
+
+    def verify_embedding_dim(self) -> None:
+        """驗證 embedding 維度與 collection 相容。"""
+        if self._collection.count() == 0:
+            return
+        test_emb = self._embed_fn(["test"])[0]
+        sample = self._collection.peek(limit=1)
+        if sample["embeddings"] and len(sample["embeddings"][0]) != len(test_emb):
+            raise RuntimeError(
+                f"Embedding 維度不符：模型產出 {len(test_emb)}，"
+                f"collection 為 {len(sample['embeddings'][0])}"
+            )
+
+    def _delete_source(self, source_label: str) -> int:
+        """刪除指定來源的所有既有區塊，確保重新匯入不殘留舊資料。"""
+        existing = self._collection.get(where={"source": source_label}, include=[])
+        count = len(existing["ids"])
+        if count > 0:
+            self._collection.delete(where={"source": source_label})
+            logger.info("Deleted %d stale chunks for '%s'", count, source_label)
+        return count
+
     def _ingest_law(self, raw_text: str, source_label: str) -> int:
         """法規文件匯入 — 依條文邊界切分。"""
         article_chunks = self._split_by_article(raw_text)
@@ -277,6 +314,7 @@ class RAGEngine:
     def ingest_document(self, filepath: str, original_name: str = "") -> int:
         """匯入文件：載入 → 切分 → 嵌入 → 存入向量資料庫，回傳區塊數。"""
         source_label = original_name or Path(filepath).name
+        self._delete_source(source_label)
         raw_docs = self._load_raw(filepath)
         if not raw_docs:
             logger.warning("No content loaded from %s", filepath)
@@ -610,6 +648,9 @@ class RAGEngine:
         self._collection = self._client.get_or_create_collection(  # type: ignore[no-untyped-call]
             name=name,
             embedding_function=self._embed_fn,
-            metadata={"hnsw:space": "cosine"},
+            metadata={
+                "hnsw:space": "cosine",
+                "embedding_model": self._settings.embedding_model,
+            },
         )
         logger.info("Collection '%s' reset.", name)
