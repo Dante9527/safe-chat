@@ -70,28 +70,29 @@ _LOADING_HTML = (
 ).read_text(encoding="utf-8")
 
 
-def _init_rag_sync() -> None:
-    """在獨立 thread 中初始化 RAG 引擎。"""
-    global rag, _rag_ready
+def _load_llm_background() -> None:
+    """在背景 thread 載入 LLM 客戶端，失敗則終止程序。"""
+    global _rag_ready
     try:
-        s = get_settings()
-        logger.info("啟動中 — 預載 RAG 引擎（SentenceTransformer + ChromaDB）…")
-        rag = RAGEngine(persist_dir=str(BASE_DIR / "data" / "chroma_db"), settings=s)
-        _ = rag.llm  # 觸發 LLM 客戶端初始化
+        if rag is not None:
+            _ = rag.llm  # 觸發 LLM 客戶端初始化
         _rag_ready = True
         logger.info("RAG 引擎就緒 — 所有元件已載入，開始接受請求。")
-    except RuntimeError:
-        logger.exception("RAG 引擎初始化失敗（不可恢復）")
-        raise SystemExit(1)
     except Exception:
-        logger.exception("RAG 引擎初始化失敗")
+        logger.exception("LLM 載入失敗")
+        import os
+        os._exit(1)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """啟動時在獨立 thread 載入模型，不阻塞 HTTP 服務。"""
+    """啟動時同步驗證 RAG 引擎，LLM 在背景載入。"""
     import threading
-    threading.Thread(target=_init_rag_sync, daemon=True).start()
+    global rag
+    s = get_settings()
+    logger.info("啟動中 — 預載 RAG 引擎（SentenceTransformer + ChromaDB）…")
+    rag = RAGEngine(persist_dir=str(BASE_DIR / "data" / "chroma_db"), settings=s)
+    threading.Thread(target=_load_llm_background, daemon=True).start()
     yield
 
 
@@ -143,13 +144,10 @@ async def security_middleware(
 ) -> Response:
     """API Key 驗證（可選）與安全回應標頭。"""
     s = get_settings()
+    path = request.url.path
+    is_api = path.startswith("/api/") and path != "/api/health"
     if s.api_key:
-        path = request.url.path
-        needs_auth = (
-            path.startswith("/api/")
-            and path != "/api/health"
-            and request.method != "OPTIONS"
-        )
+        needs_auth = is_api and request.method != "OPTIONS"
         if needs_auth:
             auth = request.headers.get("Authorization", "")
             if not hmac.compare_digest(auth, f"Bearer {s.api_key}"):
@@ -157,6 +155,15 @@ async def security_middleware(
                     status_code=401,
                     content={"detail": "未授權：請提供有效的 API Key。"},
                 )
+    elif is_api and request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("origin", "")
+        if origin and not origin.startswith(
+            ("http://localhost:", "http://127.0.0.1:")
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "跨站請求已被拒絕。"},
+            )
 
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
