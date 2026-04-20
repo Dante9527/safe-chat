@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import uuid
 from collections.abc import Generator
 from pathlib import Path
@@ -122,6 +123,8 @@ class RAGEngine:
             metadata={"hnsw:space": "cosine"},
         )
         self._validate_embedding_model(settings)
+        self._source_locks: dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
         self._llm: LLMProtocol | None = None
         self._splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
@@ -326,9 +329,21 @@ class RAGEngine:
         self._collection.upsert(ids=ids, documents=texts, metadatas=metadatas)  # type: ignore[arg-type]
         return len(chunks), ids
 
+    def _get_source_lock(self, source_label: str) -> threading.Lock:
+        """取得指定來源的 mutex，確保同名匯入序列化。"""
+        with self._locks_guard:
+            if source_label not in self._source_locks:
+                self._source_locks[source_label] = threading.Lock()
+            return self._source_locks[source_label]
+
     def ingest_document(self, filepath: str, original_name: str = "") -> int:
-        """匯入文件：載入 → 切分 → 寫入新版 → 刪除舊版，回傳區塊數。"""
+        """匯入文件（per-source 序列化）。"""
         source_label = original_name or Path(filepath).name
+        with self._get_source_lock(source_label):
+            return self._ingest_locked(filepath, source_label)
+
+    def _ingest_locked(self, filepath: str, source_label: str) -> int:
+        """載入 → 切分 → 寫入新版 → 刪除舊版，回傳區塊數。"""
         raw_docs = self._load_raw(filepath)
         if not raw_docs:
             logger.warning("No content loaded from %s", filepath)
@@ -668,6 +683,8 @@ class RAGEngine:
 
     def reset(self) -> None:
         """刪除並重建向量集合（清空知識庫）。"""
+        with self._locks_guard:
+            self._source_locks.clear()
         name = self._settings.collection_name
         self._client.delete_collection(name)  # type: ignore[no-untyped-call]
         self._collection = self._client.get_or_create_collection(  # type: ignore[no-untyped-call]
