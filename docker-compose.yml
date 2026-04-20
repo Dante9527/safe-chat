@@ -26,6 +26,8 @@ services:
     volumes:
       - ./data:/app/data
     env_file: .env    # 所有設定集中在 .env，說明見 .env.example
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
