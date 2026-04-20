@@ -22,7 +22,7 @@ services:
     build: .
     container_name: safe-chat
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./data:/app/data
     env_file: .env    # 所有設定集中在 .env，說明見 .env.example
