@@ -71,11 +71,16 @@ _LOADING_HTML = (
 
 
 def _load_llm_background() -> None:
-    """在背景 thread 載入 LLM 客戶端，失敗則終止程序。"""
+    """在背景 thread 載入 LLM 客戶端並驗證可達性，失敗則終止程序。"""
     global _rag_ready
     try:
         if rag is not None:
-            _ = rag.llm  # 觸發 LLM 客戶端初始化
+            _ = rag.llm  # 建構 ChatOllama
+            result = health_checks.check_llm(get_settings())
+            if not result.get("ok"):
+                raise RuntimeError(
+                    f"Ollama 模型 '{get_settings().ollama_model}' 不可用"
+                )
         _rag_ready = True
         logger.info("RAG 引擎就緒 — 所有元件已載入，開始接受請求。")
     except Exception:
@@ -136,35 +141,13 @@ if settings.cors_origins:
 
 
 # ---------------------------------------------------------------------------
-# 中介層 — API Key 驗證 + 安全標頭
+# 中介層 — 安全標頭
 # ---------------------------------------------------------------------------
 @app.middleware("http")
 async def security_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """API Key 驗證（可選）與安全回應標頭。"""
-    s = get_settings()
-    path = request.url.path
-    is_api = path.startswith("/api/") and path != "/api/health"
-    if s.api_key:
-        needs_auth = is_api and request.method != "OPTIONS"
-        if needs_auth:
-            auth = request.headers.get("Authorization", "")
-            if not hmac.compare_digest(auth, f"Bearer {s.api_key}"):
-                return JSONResponse(
-                    status_code=401,
-                    content={"detail": "未授權：請提供有效的 API Key。"},
-                )
-    elif is_api and request.method not in ("GET", "HEAD", "OPTIONS"):
-        origin = request.headers.get("origin", "")
-        if origin and not origin.startswith(
-            ("http://localhost:", "http://127.0.0.1:")
-        ):
-            return JSONResponse(
-                status_code=403,
-                content={"detail": "跨站請求已被拒絕。"},
-            )
-
+    """安全回應標頭。"""
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -264,6 +247,9 @@ async def upload_document(
         logger.error("Ingest failed for %s: %s", dest.name, e)
         dest.unlink(missing_ok=True)
         raise HTTPException(422, "文件處理失敗，請確認檔案格式正確。") from e
+    if num_chunks == 0:
+        dest.unlink(missing_ok=True)
+        raise HTTPException(422, "檔案未包含可搜尋的文字內容。")
     return JSONResponse(
         {
             "status": "ok",
